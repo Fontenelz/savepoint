@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: savepoint-db
+    environment:
+      POSTGRES_USER: savepoint
+      POSTGRES_PASSWORD: savepoint
+      POSTGRES_DB: savepoint
+    ports:
+      - "5433:5432"
+    volumes:
+      - savepoint-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U savepoint"]
+      interval: 3s
+      retries: 20
+
+volumes:
+  savepoint-data:

@@ -1,0 +1,20 @@
+import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
+import { AuthArt } from '@/components/AuthArt';
+import { LoginForm } from '@/components/forms';
+import { getViewer } from '@/lib/session';
+
+export const metadata: Metadata = { title: 'Entrar' };
+
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+  if (await getViewer()) redirect('/');
+  const { next } = await searchParams;
+  return (
+    <div className="auth">
+      <AuthArt quote="“Só mais uma partida” — você, há 4 horas." />
+      <div className="auth-form">
+        <LoginForm next={next} />
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,40 @@
+{
+  "name": "@savepoint/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "prisma generate && nest build",
+    "dev": "prisma generate && nest start --watch --preserveWatchOutput",
+    "start": "node dist/main.js",
+    "typecheck": "prisma generate && tsc --noEmit -p tsconfig.json",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed && nest build && node dist/catalog/sync.cli.js --optional",
+    "db:reset": "prisma migrate reset --force --skip-seed && pnpm db:seed",
+    "catalog:sync": "nest build && node dist/catalog/sync.cli.js"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@fastify/static": "^8.3.0",
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/core": "^11.1.6",
+    "@nestjs/jwt": "^11.0.0",
+    "@nestjs/platform-fastify": "^11.1.6",
+    "@prisma/client": "^6.16.2",
+    "@savepoint/shared": "workspace:*",
+    "bcryptjs": "^3.0.2",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.10",
+    "@types/node": "^22.18.6",
+    "prisma": "^6.16.2",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}
