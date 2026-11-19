@@ -7,7 +7,7 @@ import { Icon } from './Icon';
  * Carrossel horizontal de capas: arrastar/deslizar no celular, setas no desktop.
  * Usa scroll nativo com scroll-snap (acessível, funciona com teclado e trackpad).
  */
-export function Slider({ label, children }: { label: string; children: ReactNode }) {
+export function Slider({ label, children, size = 'md' }: { label: string; children: ReactNode; size?: 'md' | 'lg' }) {
   const track = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState({ start: true, end: true });
 
@@ -41,7 +41,7 @@ export function Slider({ label, children }: { label: string; children: ReactNode
   const scrollable = !(edges.start && edges.end);
 
   return (
-    <div className="slider" role="region" aria-roledescription="carrossel" aria-label={label}>
+    <div className={`slider slider--${size}`} role="region" aria-roledescription="carrossel" aria-label={label}>
       {scrollable && (
         <button type="button" className="slider-btn prev" onClick={() => go(-1)} disabled={edges.start} aria-label="Anteriores">
           <Icon name="up" size={16} className="rot-left" />

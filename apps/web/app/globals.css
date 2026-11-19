@@ -2818,3 +2818,170 @@ a.chip:hover {
     display: none;
   }
 }
+
+/* ==========================================================================
+   "Seu save": carrossel de jogando / quero jogar
+   ========================================================================== */
+.queue-section {
+  margin-top: 32px;
+}
+
+.queue-section .section-head h2 {
+  color: var(--text);
+}
+
+.queue-counts {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.queue-counts b {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--text);
+}
+
+.queue-counts .c-playing {
+  color: var(--st-playing);
+}
+
+.queue-counts .c-backlog {
+  color: var(--st-backlog);
+}
+
+.slider--lg .slider-track {
+  grid-auto-columns: calc((100% - 4 * 16px) / 5);
+  gap: 16px;
+}
+
+.queue-card {
+  display: block;
+}
+
+.queue-cover {
+  position: relative;
+}
+
+.queue-card .cover {
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+
+.queue-card.is-playing .cover {
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.08),
+    0 0 0 2px var(--st-playing),
+    0 10px 26px rgb(0 0 0 / 0.5);
+}
+
+.queue-card:hover .cover {
+  transform: translateY(-3px);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.08),
+    0 0 0 2px var(--accent),
+    0 14px 30px rgb(0 0 0 / 0.55);
+}
+
+.queue-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px 3px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: rgb(0 0 0 / 0.78);
+  backdrop-filter: blur(4px);
+}
+
+.is-playing .queue-badge {
+  color: var(--st-playing);
+  box-shadow: inset 0 0 0 1px rgb(92 200 255 / 0.5);
+}
+
+.is-backlog .queue-badge {
+  color: var(--st-backlog);
+  box-shadow: inset 0 0 0 1px rgb(143 150 255 / 0.5);
+}
+
+.queue-info {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.queue-info strong {
+  font-family: var(--font-display);
+  font-size: 14px;
+  line-height: 1.2;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.queue-card:hover .queue-info strong {
+  color: var(--accent);
+}
+
+.queue-info span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.queue-bar {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.queue-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--st-playing), var(--accent));
+}
+
+.queue-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  color: var(--text-2);
+}
+
+@media (max-width: 980px) {
+  .slider--lg .slider-track {
+    grid-auto-columns: calc((100% - 3 * 16px) / 3.4);
+  }
+}
+
+@media (max-width: 760px) {
+  .slider--lg .slider-track {
+    /* 2 cards + um pedaço do próximo */
+    grid-auto-columns: calc((100% - 2 * 12px) / 2.35);
+    gap: 12px;
+  }
+
+  .queue-info strong {
+    font-size: 13px;
+  }
+}
+
+.queue-hours {
+  font-variant-numeric: tabular-nums;
+}

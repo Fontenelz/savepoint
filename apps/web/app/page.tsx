@@ -1,13 +1,15 @@
-import { PLAY_STATUS_VERB, type HomeData } from '@savepoint/shared';
+import { PLAY_STATUS_VERB, type HomeData, type QueueData } from '@savepoint/shared';
 import Link from 'next/link';
 import { Avatar, CoverWall, ListCard, Poster, SectionHead, Stars } from '@/components/bits';
 import { Icon } from '@/components/Icon';
+import { QueueSection } from '@/components/QueueCarousel';
 import { Review } from '@/components/Review';
 import { api } from '@/lib/api';
 import { getViewer } from '@/lib/session';
 
 export default async function HomePage() {
   const [viewer, home] = await Promise.all([getViewer(), api<HomeData>('/home')]);
+  const queue = viewer ? await api<QueueData>(`/users/${viewer.username}/queue`).catch(() => null) : null;
   // Um jogo por vez na fileira dos amigos (registros repetidos/replays viram uma capa só).
   const seen = new Set<string>();
   const friends = home.friends.filter((log) => !seen.has(log.game.id) && Boolean(seen.add(log.game.id)));
@@ -61,6 +63,8 @@ export default async function HomePage() {
       )}
 
       <div className="shell">
+        {viewer && queue && <QueueSection data={queue} username={viewer.username} title="Seu save" isMe />}
+
         {viewer && friends.length > 0 && (
           <section className="section">
             <SectionHead title="Novidades dos amigos" href="/activity" link="Toda a atividade" />

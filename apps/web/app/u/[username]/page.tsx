@@ -1,9 +1,11 @@
-import { MAX_FAVORITES } from '@savepoint/shared';
+import { MAX_FAVORITES, type QueueData } from '@savepoint/shared';
+import { api } from '@/lib/api';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Histogram, Poster, SectionHead, ShelfBar, Stars } from '@/components/bits';
 import { Icon } from '@/components/Icon';
 import { Review } from '@/components/Review';
+import { QueueSection } from '@/components/QueueCarousel';
 import { Slider } from '@/components/Slider';
 import { getProfile } from '@/lib/profile';
 import { getViewer } from '@/lib/session';
@@ -18,7 +20,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ProfilePage({ params }: Props) {
   const { username } = await params;
-  const [profile, viewer] = await Promise.all([getProfile(username), getViewer()]);
+  const [profile, viewer, queue] = await Promise.all([
+    getProfile(username),
+    getViewer(),
+    api<QueueData>(`/users/${encodeURIComponent(username)}/queue`),
+  ]);
   const base = `/u/${profile.user.username}`;
   const ratingTotal = profile.histogram.reduce((a, b) => a + b, 0);
   const avg = ratingTotal ? profile.histogram.reduce((s, n, i) => s + n * (i + 1), 0) / ratingTotal : null;
@@ -41,16 +47,7 @@ export default async function ProfilePage({ params }: Props) {
           </div>
         </section>
 
-        {profile.currentlyPlaying.length > 0 && (
-          <section className="section">
-            <SectionHead title="Jogando agora" href={`${base}/games?filter=PLAYING`} />
-            <Slider label="Jogando agora">
-              {profile.currentlyPlaying.map((g) => (
-                <Poster key={g.id} game={g} status="PLAYING" />
-              ))}
-            </Slider>
-          </section>
-        )}
+        <QueueSection data={queue} username={profile.user.username} title="Jogando e na fila" isMe={profile.isMe} />
 
         <section className="section">
           <SectionHead title="Atividade recente" href={`${base}/diary`} link="Diário" />
