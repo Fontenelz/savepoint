@@ -3004,7 +3004,7 @@ a.chip:hover {
 .rank-item {
   position: relative;
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   align-items: flex-end;
   container-type: inline-size;
 }
@@ -3013,13 +3013,14 @@ a.chip:hover {
   position: relative;
   z-index: 1;
   width: 64.5%; /* = 1 / 1.55 → largura igual à das outras capas */
+  margin-left: 45px;
 }
 
 .rank-num {
   position: absolute;
   /* alinhado à direita, encostando e passando um pouco por baixo da capa */
   /* capa começa em 35,5% da largura: borda do número em 35% → só uma pontinha por baixo */
-  right: 55%;
+  right: 65%;
   top: 40%;
   translate: 0 -50%;
   z-index: 0;
@@ -3043,21 +3044,26 @@ a.chip:hover {
   -webkit-text-stroke-color: var(--accent);
 }
 
+.slider-item:nth-child(1) .rank-cover {
+  margin-left: 25px;
+}
+
 /* "10" tem dois dígitos: compacta um pouco para não invadir demais a capa */
 /* 10º item: coluna 1,258× mais larga → percentuais/cqw compensados para manter
    a capa e a altura do número iguais às dos outros */
 .slider-item:nth-child(10) .rank-cover {
-  width: 51.3%;
+  width: 52.5%;
+  margin-left: 50px;
 }
 
 /* 1º item: o "1" é estreito e sumia atrás da capa → mais para a esquerda (~72% visível, como os outros) */
 .slider-item:nth-child(1) .rank-num {
-  right: 60%;
+  right: 75%;
 }
 
 .slider-item:nth-child(10) .rank-num {
   /* o "10" aparecia inteiro → mais para baixo da capa (~72% visível, como os outros) */
-  right: 40%;
+  right: 60%;
   font-size: 57cqw;
   letter-spacing: -0.06em;
 }
