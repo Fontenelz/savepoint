@@ -21,16 +21,19 @@ export function Stars({ rating, className = '' }: { rating: number | null | unde
   );
 }
 
+/** Avatar sem foto: silhueta de pessoa sobre a cor própria do usuário. */
 export function Avatar({ user, size = 32 }: { user: Pick<UserSummary, 'displayName' | 'avatarHue'>; size?: number }) {
-  const initials = user.displayName
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((p) => p[0])
-    .join('')
-    .toUpperCase();
   return (
-    <span className="avatar" style={{ '--h': user.avatarHue, '--size': `${size}px` } as CSSProperties} aria-hidden>
-      {initials}
+    <span
+      className="avatar"
+      style={{ '--h': user.avatarHue, '--size': `${size}px` } as CSSProperties}
+      role="img"
+      aria-label={user.displayName}
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="9.2" r="4.3" />
+        <path d="M3.2 24c0-5.3 3.9-8.6 8.8-8.6s8.8 3.3 8.8 8.6z" />
+      </svg>
     </span>
   );
 }
@@ -59,9 +62,9 @@ export function Poster({
     <div>
       <Link href={`/games/${game.slug}`} className="poster" aria-label={game.title}>
         {tip && (
-          <span className="poster-tip">
+          <span className="poster-tip" aria-hidden>
             {game.title}
-            {game.releaseYear ? ` (${game.releaseYear})` : ''}
+            {game.releaseYear ? <small>{game.releaseYear}</small> : null}
           </span>
         )}
         {status && (

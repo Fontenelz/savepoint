@@ -11,6 +11,8 @@ import {
   type Paginated,
   type PlayStatus,
   type Profile,
+  type QueueData,
+  type QueueItem,
   type UpdateProfileInput,
 } from '@savepoint/shared';
 import {
@@ -74,7 +76,7 @@ export class UsersService {
         this.prisma.logEntry.findMany({
           where: { userId: user.id },
           orderBy: [{ playedOn: 'desc' }, { createdAt: 'desc' }],
-          take: 8,
+          take: 18, // carrossel "Atividade recente"
           select: logSelect(viewerId),
         }),
         this.prisma.logEntry.findMany({
@@ -86,7 +88,7 @@ export class UsersService {
         this.prisma.userGame.findMany({
           where: { userId: user.id, status: 'PLAYING' },
           orderBy: { updatedAt: 'desc' },
-          take: 6,
+          take: 18, // carrossel "Jogando agora"
           select: { game: { select: gameSummarySelect } },
         }),
         this.prisma.userGame.findMany({
@@ -180,6 +182,26 @@ export class UsersService {
       query.page,
       pageSize,
     );
+  }
+
+  /** "Seu save": jogos em andamento e na fila, para o carrossel da home e do perfil. */
+  async queue(username: string): Promise<QueueData> {
+    const userId = await this.findId(username);
+    const select = {
+      ...userGameStateSelect,
+      updatedAt: true,
+      game: { select: { ...gameSummarySelect, avgHours: true } },
+    } satisfies Prisma.UserGameSelect;
+    const [playing, backlog] = await Promise.all([
+      this.prisma.userGame.findMany({ where: { userId, status: 'PLAYING' }, orderBy: { updatedAt: 'desc' }, take: 30, select }),
+      this.prisma.userGame.findMany({ where: { userId, status: 'BACKLOG' }, orderBy: { createdAt: 'desc' }, take: 30, select }),
+    ]);
+    const toItem = ({ game, updatedAt, ...state }: (typeof playing)[number]): QueueItem => ({
+      game: { ...toGameSummary(game), avgHours: game.avgHours },
+      state: toUserGameState(state),
+      updatedAt: updatedAt.toISOString(),
+    });
+    return { playing: playing.map(toItem), backlog: backlog.map(toItem) };
   }
 
   async diary(username: string, page: number, viewerId?: string): Promise<Paginated<LogView>> {

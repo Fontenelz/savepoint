@@ -154,6 +154,18 @@ export interface LibraryItem {
   updatedAt: string;
 }
 
+/** Item da "fila" do usuário (jogando / quero jogar), com tempo médio para calcular progresso. */
+export interface QueueItem {
+  game: GameSummary & { avgHours: number | null };
+  state: UserGameState;
+  updatedAt: string;
+}
+
+export interface QueueData {
+  playing: QueueItem[];
+  backlog: QueueItem[];
+}
+
 export interface Paginated<T> {
   items: T[];
   page: number;

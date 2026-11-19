@@ -1,8 +1,7 @@
 import type { Viewer } from '@savepoint/shared';
 import Link from 'next/link';
-import { logoutAction } from '@/app/actions';
-import { Avatar } from './bits';
 import { Icon } from './Icon';
+import { UserMenu } from './UserMenu';
 
 export function Logo() {
   return (
@@ -33,26 +32,7 @@ export function SiteHeader({ viewer }: { viewer: Viewer | null }) {
         </form>
         <div className="header-user">
           {viewer ? (
-            <details className="menu">
-              <summary>
-                <Avatar user={viewer} size={30} />
-                <span className="hide-sm">{viewer.displayName.split(' ')[0]}</span>
-              </summary>
-              <div className="menu-panel">
-                <Link href={`/u/${viewer.username}`}>Perfil</Link>
-                <Link href={`/u/${viewer.username}/diary`}>Diário</Link>
-                <Link href={`/u/${viewer.username}/games?filter=BACKLOG`}>Backlog</Link>
-                <Link href={`/u/${viewer.username}/lists`}>Minhas listas</Link>
-                <hr />
-                <Link href="/lists/new">Nova lista</Link>
-                <Link href="/games/new">Cadastrar jogo</Link>
-                <Link href="/settings">Editar perfil</Link>
-                <hr />
-                <form action={logoutAction}>
-                  <button type="submit">Sair</button>
-                </form>
-              </div>
-            </details>
+            <UserMenu viewer={viewer} />
           ) : (
             <>
               <Link href="/login" className="btn btn-ghost btn-sm">

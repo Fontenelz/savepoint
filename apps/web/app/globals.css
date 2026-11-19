@@ -4,6 +4,7 @@
    ========================================================================== */
 :root {
   --bg: #0d0e12;
+  --nav-bg: #050507; /* navbar: mais escuro e sólido que o resto do site */
   --bg-2: #13151b;
   --surface: #1a1d25;
   --surface-2: #222632;
@@ -34,7 +35,8 @@
   --shell: 1120px;
   --gutter: 20px;
 
-  --font-display: var(--font-space), 'Space Grotesk', system-ui, sans-serif;
+  --font-display: var(--font-display-src), system-ui, sans-serif;
+  --font-cover: var(--font-cover-src), var(--font-display-src), sans-serif;
   --font-body: var(--font-inter), 'Inter', system-ui, sans-serif;
   --font-mono: var(--font-jet), 'JetBrains Mono', ui-monospace, monospace;
 
@@ -143,9 +145,26 @@ p {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgb(13 14 18 / 0.86);
-  backdrop-filter: blur(10px) saturate(1.3);
-  border-bottom: 1px solid var(--line);
+  background: var(--nav-bg);
+  border-bottom: 1px solid #000;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.45);
+}
+
+/* Linha de destaque na base do navbar */
+.site-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--info) 55%, var(--heart));
+  opacity: 0.85;
+}
+
+.site-header .header-search input {
+  background: #121318;
+  border-color: #1f222b;
 }
 
 .site-header .shell {
@@ -247,8 +266,11 @@ p {
   position: relative;
 }
 
-.menu summary {
-  list-style: none;
+/* Botão do menu do usuário (componente UserMenu) */
+.menu-trigger {
+  border: 0;
+  background: none;
+  padding: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -258,11 +280,8 @@ p {
   color: var(--text-2);
 }
 
-.menu summary::-webkit-details-marker {
-  display: none;
-}
-
-.menu[open] summary {
+.menu.open .menu-trigger,
+.menu-trigger:hover {
   color: var(--text);
 }
 
@@ -596,11 +615,12 @@ a.chip:hover {
 }
 
 .cover-title {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: max(9px, 12.5cqw);
-  line-height: 0.98;
-  letter-spacing: -0.035em;
+  /* condensada: letras maiores sem estourar a capa */
+  font-family: var(--font-cover);
+  font-weight: 800;
+  font-size: max(11px, 17cqw);
+  line-height: 0.9;
+  letter-spacing: 0;
   text-transform: uppercase;
   text-wrap: balance;
   overflow-wrap: anywhere;
@@ -645,41 +665,52 @@ a.chip:hover {
   transition: box-shadow 0.15s;
 }
 
+/* Legenda da capa (nome do jogo): fica DENTRO da capa, na base, sobre um degradê.
+   Nunca sai dos limites da capa, então não cobre títulos de seção nem alarga a página. */
 .poster-tip {
   position: absolute;
-  left: 50%;
-  bottom: calc(100% + 8px);
-  translate: -50% 4px;
-  opacity: 0;
-  pointer-events: none;
-  z-index: 10;
-  background: #000;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  padding: 26px 8px 8px;
+  border-radius: 0 0 4px 4px;
+  background: linear-gradient(to bottom, transparent, rgb(0 0 0 / 0.88) 55%);
   color: #fff;
   font-size: 12px;
   font-weight: 600;
-  padding: 5px 9px;
-  border-radius: 4px;
-  white-space: nowrap;
-  max-width: 240px;
+  line-height: 1.25;
+  pointer-events: none;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  transition: opacity 0.12s, translate 0.12s;
+  opacity: 0;
+  transition: opacity 0.15s;
 }
 
-.poster:hover .poster-tip {
-  opacity: 1;
-  translate: -50% 0;
+.poster-tip small {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.7;
 }
 
-/* Fora do hover o tooltip não existe no layout (invisível ainda ocupava espaço e,
-   nas capas da borda, alargava a página). Em telas de toque ele nunca aparece. */
-.poster:not(:hover) .poster-tip {
-  display: none;
-}
-
-@media (hover: none) {
+/* Só em dispositivos com mouse de verdade. Em telas de toque o "hover" gruda depois
+   do toque (e só sai ao tocar em outro elemento), então lá a legenda não existe:
+   tocar na capa abre o jogo direto. */
+@media not ((hover: hover) and (pointer: fine)) {
   .poster-tip {
-    display: none !important;
+    display: none;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .poster:hover .poster-tip,
+  .poster:focus-visible .poster-tip {
+    opacity: 1;
   }
 }
 
@@ -750,14 +781,20 @@ a.chip:hover {
   height: var(--size);
   flex: none;
   border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: calc(var(--size) * 0.4);
-  color: #0d0e12;
+  display: block;
+  overflow: hidden;
+  color: rgb(13 14 18 / 0.55);
   background: linear-gradient(140deg, hsl(var(--h) 85% 70%), hsl(calc(var(--h) + 40) 75% 52%));
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.2);
+}
+
+/* Silhueta: ocupa a base do círculo (os ombros são cortados pela borda) */
+.avatar svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+  translate: 0 6%;
 }
 
 .user-line {
@@ -952,7 +989,8 @@ a.chip:hover {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.review:last-child {
+/* Última review de cada grupo (não seguida por outra review) fica sem borda */
+.review:not(:has(+ .review)) {
   border-bottom: 0;
 }
 
@@ -2681,5 +2719,102 @@ a.chip:hover {
   .diary .icons {
     gap: 4px;
     flex-wrap: wrap;
+  }
+}
+
+/* ==========================================================================
+   Slider (carrossel horizontal de capas)
+   ========================================================================== */
+.slider {
+  position: relative;
+}
+
+.slider-track {
+  display: grid;
+  grid-auto-flow: column;
+  /* desktop: 6 capas visíveis */
+  grid-auto-columns: calc((100% - 5 * 14px) / 6);
+  gap: 14px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  /* respiro para o contorno de hover não ser cortado pelo overflow */
+  padding: 3px;
+  margin: -3px;
+  /* o snap alinha pela borda do respiro, mantendo a 1ª capa alinhada ao título */
+  scroll-padding-inline: 3px;
+}
+
+.slider-track::-webkit-scrollbar {
+  display: none;
+}
+
+.slider-item {
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
+.slider-btn {
+  position: absolute;
+  top: 36%;
+  z-index: 5;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-2);
+  background: rgb(26 29 37 / 0.92);
+  color: var(--text);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.5);
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.slider-btn:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+.slider-btn:disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.slider-btn.prev {
+  left: -18px;
+}
+
+.slider-btn.next {
+  right: -18px;
+}
+
+.rot-left {
+  rotate: -90deg;
+}
+
+.rot-right {
+  rotate: 90deg;
+}
+
+@media (max-width: 980px) {
+  .slider-track {
+    grid-auto-columns: calc((100% - 3 * 14px) / 4.3);
+  }
+}
+
+@media (max-width: 760px) {
+  .slider-track {
+    /* 3 capas + um pedaço da próxima, indicando que dá para deslizar */
+    grid-auto-columns: calc((100% - 3 * 10px) / 3.35);
+    gap: 10px;
+  }
+}
+
+/* Em telas de toque o gesto de deslizar substitui as setas */
+@media (hover: none) {
+  .slider-btn {
+    display: none;
   }
 }

@@ -45,6 +45,11 @@ export class UsersController {
     return this.users.library(username, query);
   }
 
+  @Get('users/:username/queue')
+  queue(@Param('username') username: string) {
+    return this.users.queue(username);
+  }
+
   @Get('users/:username/diary')
   @OptionalAuth()
   diary(@Param('username') username: string, @Query(pageQuery) query: { page: number }, @CurrentUser() user?: AuthUser) {

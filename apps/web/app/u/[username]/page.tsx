@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Histogram, Poster, SectionHead, ShelfBar, Stars } from '@/components/bits';
 import { Icon } from '@/components/Icon';
 import { Review } from '@/components/Review';
+import { Slider } from '@/components/Slider';
 import { getProfile } from '@/lib/profile';
 import { getViewer } from '@/lib/session';
 
@@ -43,11 +44,11 @@ export default async function ProfilePage({ params }: Props) {
         {profile.currentlyPlaying.length > 0 && (
           <section className="section">
             <SectionHead title="Jogando agora" href={`${base}/games?filter=PLAYING`} />
-            <div className="row-posters">
+            <Slider label="Jogando agora">
               {profile.currentlyPlaying.map((g) => (
                 <Poster key={g.id} game={g} status="PLAYING" />
               ))}
-            </div>
+            </Slider>
           </section>
         )}
 
@@ -56,8 +57,8 @@ export default async function ProfilePage({ params }: Props) {
           {profile.recentLogs.length === 0 ? (
             <p className="muted">Nada registrado ainda.</p>
           ) : (
-            <div className="row-posters">
-              {profile.recentLogs.slice(0, 6).map((log) => (
+            <Slider label="Atividade recente">
+              {profile.recentLogs.map((log) => (
                 <Poster key={log.id} game={log.game}>
                   <Stars rating={log.rating} />
                   <span style={{ display: 'flex', gap: 4 }}>
@@ -67,7 +68,7 @@ export default async function ProfilePage({ params }: Props) {
                   </span>
                 </Poster>
               ))}
-            </div>
+            </Slider>
           )}
         </section>
 
