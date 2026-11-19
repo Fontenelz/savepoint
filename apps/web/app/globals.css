@@ -2732,6 +2732,8 @@ a.chip:hover {
 .slider-track {
   display: grid;
   grid-auto-flow: column;
+  /* só rolagem horizontal: nada que passe da altura cria barra vertical */
+  overflow-y: hidden;
   /* desktop: 6 capas visíveis */
   grid-auto-columns: calc((100% - 5 * 14px) / 6);
   gap: 14px;
@@ -2984,4 +2986,95 @@ a.chip:hover {
 
 .queue-hours {
   font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   Top 10 (número gigante vazado atrás da capa)
+   ========================================================================== */
+.slider--rank .slider-track {
+  /* capa com a MESMA largura das fileiras de 6 colunas; o número ocupa +55% à esquerda */
+  --cover-w: calc((100% - 5 * 14px) / 6);
+  --item-w: calc(var(--cover-w) * 1.55);
+  grid-auto-columns: var(--item-w);
+  /* o 10º item é mais largo (+40% da capa) para o "10" caber inteiro */
+  grid-template-columns: repeat(9, var(--item-w)) calc(var(--item-w) + var(--cover-w) * 0.4);
+  gap: 6px;
+}
+
+.rank-item {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  container-type: inline-size;
+}
+
+.rank-cover {
+  position: relative;
+  z-index: 1;
+  width: 64.5%; /* = 1 / 1.55 → largura igual à das outras capas */
+}
+
+.rank-num {
+  position: absolute;
+  /* alinhado à direita, encostando e passando um pouco por baixo da capa */
+  /* capa começa em 35,5% da largura: borda do número em 35% → só uma pontinha por baixo */
+  right: 55%;
+  top: 40%;
+  translate: 0 -50%;
+  z-index: 0;
+  font-family: var(--font-cover);
+  font-weight: 900;
+  /* sem tamanho óptico: em tamanho gigante a fonte afinaria */
+  font-optical-sizing: none;
+  font-variation-settings: "opsz" 10;
+  font-size: 72cqw;
+  line-height: 0.8;
+  letter-spacing: -0.04em;
+  text-align: right;
+  color: var(--bg);
+  -webkit-text-stroke: 4px rgb(200 204 216 / 0.6);
+  paint-order: stroke fill;
+  user-select: none;
+  pointer-events: none;
+}
+
+.rank-item:hover .rank-num {
+  -webkit-text-stroke-color: var(--accent);
+}
+
+/* "10" tem dois dígitos: compacta um pouco para não invadir demais a capa */
+/* 10º item: coluna 1,258× mais larga → percentuais/cqw compensados para manter
+   a capa e a altura do número iguais às dos outros */
+.slider-item:nth-child(10) .rank-cover {
+  width: 51.3%;
+}
+
+/* 1º item: o "1" é estreito e sumia atrás da capa → mais para a esquerda (~72% visível, como os outros) */
+.slider-item:nth-child(1) .rank-num {
+  right: 60%;
+}
+
+.slider-item:nth-child(10) .rank-num {
+  /* o "10" aparecia inteiro → mais para baixo da capa (~72% visível, como os outros) */
+  right: 40%;
+  font-size: 57cqw;
+  letter-spacing: -0.06em;
+}
+
+@media (max-width: 980px) {
+  .slider--rank .slider-track {
+    --cover-w: calc((100% - 3 * 14px) / 4);
+  }
+}
+
+@media (max-width: 760px) {
+  .slider--rank .slider-track {
+    --cover-w: calc((100% - 2 * 10px) / 3);
+    gap: 4px;
+  }
+
+  .rank-num {
+    -webkit-text-stroke-width: 3px;
+  }
 }

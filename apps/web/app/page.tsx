@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Avatar, CoverWall, ListCard, Poster, SectionHead, Stars } from '@/components/bits';
 import { Icon } from '@/components/Icon';
 import { QueueSection } from '@/components/QueueCarousel';
+import { TopRanking } from '@/components/TopRanking';
 import { Review } from '@/components/Review';
 import { api } from '@/lib/api';
 import { getViewer } from '@/lib/session';
@@ -86,12 +87,8 @@ export default async function HomePage() {
         )}
 
         <section className="section">
-          <SectionHead title="Em alta na comunidade" href="/games" link="Catálogo" />
-          <div className="row-posters">
-            {home.trending.slice(0, 12).map((g) => (
-              <Poster key={g.id} game={g} />
-            ))}
-          </div>
+          <SectionHead title="Top 10 em alta na comunidade" href="/games" link="Catálogo" />
+          <TopRanking games={home.trending} label="Top 10 em alta na comunidade" />
         </section>
 
         {!viewer && (
