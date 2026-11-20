@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { MAX_FAVORITES, type LibraryEntryInput, type UserGameState, type ViewerGameMark } from '@savepoint/shared';
-import { fromDateString, toUserGameState, userGameStateSelect } from '../core/mappers';
+import { MAX_FAVORITES, type GameSummary, type LibraryEntryInput, type UserGameState, type ViewerGameMark } from '@savepoint/shared';
+import { fromDateString, gameSummarySelect, toGameSummary, toUserGameState, userGameStateSelect } from '../core/mappers';
 import { PrismaService } from '../core/prisma.service';
 import { StatsService } from '../core/stats.service';
 
@@ -93,6 +93,31 @@ export class LibraryService {
       select: userGameStateSelect,
     });
     return toUserGameState(entry);
+  }
+
+  /**
+   * Substitui o Top 4 inteiro pela lista recebida (a ordem vira o ranking).
+   * Usado pelo editor do perfil: adicionar, trocar, reordenar e remover numa chamada só.
+   */
+  async setFavorites(userId: string, gameIds: string[]): Promise<GameSummary[]> {
+    const found = await this.prisma.game.count({ where: { id: { in: gameIds } } });
+    if (found !== gameIds.length) throw new NotFoundException('Jogo não encontrado');
+
+    await this.prisma.$transaction(async (tx) => {
+      // Zera antes de gravar: (userId, favoriteRank) é único.
+      await tx.userGame.updateMany({ where: { userId, favoriteRank: { not: null } }, data: { favoriteRank: null } });
+      for (const [i, gameId] of gameIds.entries()) {
+        await tx.userGame.upsert({
+          where: { userId_gameId: { userId, gameId } },
+          create: { userId, gameId, favoriteRank: i + 1 },
+          update: { favoriteRank: i + 1 },
+        });
+      }
+    });
+
+    const rows = await this.prisma.game.findMany({ where: { id: { in: gameIds } }, select: gameSummarySelect });
+    const byId = new Map(rows.map((r) => [r.id, toGameSummary(r)]));
+    return gameIds.flatMap((id) => byId.get(id) ?? []);
   }
 
   /** Marcas do usuário (status, nota, like, se está em alguma lista) para vários jogos de uma vez. */
