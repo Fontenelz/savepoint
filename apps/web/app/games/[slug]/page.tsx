@@ -1,11 +1,12 @@
-import { PLAY_STATUS_LABEL, formatHours, type CatalogSource, type GameDetail, type ListSummary } from '@savepoint/shared';
+import { PLAY_STATUS_LABEL, formatAvg, formatHours, type CatalogSource, type GameDetail, type ListSummary } from '@savepoint/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Avatar, Histogram, ListCard, SectionHead, ShelfBar, Stars } from '@/components/bits';
-import { GameActions } from '@/components/GameActions';
+import { Avatar, Histogram, ListCard, Poster, SectionHead, ShelfBar, Stars } from '@/components/bits';
+import { GameActions, OpenLogButton } from '@/components/GameActions';
 import { GameCover } from '@/components/GameCover';
 import { Icon, STATUS_COLOR } from '@/components/Icon';
 import { Review } from '@/components/Review';
+import { Slider } from '@/components/Slider';
 import { api, apiOrNotFound } from '@/lib/api';
 import { getViewer } from '@/lib/session';
 
@@ -34,6 +35,8 @@ export default async function GamePage({ params }: Props) {
   const [viewer, game] = await Promise.all([getViewer(), apiOrNotFound<GameDetail>(`/games/${slug}`)]);
   const myLists = viewer ? await api<ListSummary[]>(`/users/${viewer.username}/lists`) : [];
   const { stats } = game;
+  // "Jogaram" = na estante, menos quem só quer jogar (inclui quem veio da Steam só com horas).
+  const played = Math.max(0, stats.playerCount - stats.statusCounts.BACKLOG);
 
   return (
     <>
@@ -51,36 +54,9 @@ export default async function GamePage({ params }: Props) {
 
       <div className="shell game-layout">
         <aside className="game-cover">
-          <GameCover game={game} />
-          <div className="game-counters">
-            <span className="c-play" title="Jogadores">
-              <Icon name="gamepad" size={14} /> <span className="mono">{stats.playerCount}</span>
-            </span>
-            <span className="c-list" title="Em listas">
-              <Icon name="list" size={14} /> <span className="mono">{stats.listCount}</span>
-            </span>
-            <span className="c-like" title="Curtidas">
-              <Icon name="heart" size={14} fill /> <span className="mono">{stats.likeCount}</span>
-            </span>
+          <div className="game-cover-art">
+            <GameCover game={game} />
           </div>
-        </aside>
-
-        <section className="game-main">
-          <h1 className="game-title">{game.title}</h1>
-          <div className="game-sub">
-            {game.releaseYear && (
-              <Link href={`/games?year=${game.releaseYear}`} className="mono">
-                {game.releaseYear}
-              </Link>
-            )}
-            {game.developer && (
-              <span>
-                por <strong style={{ color: 'var(--text)' }}>{game.developer}</strong>
-              </span>
-            )}
-          </div>
-
-          {game.summary && <p className="game-summary">{game.summary}</p>}
 
           <dl className="facts">
             {game.genres.length > 0 && (
@@ -126,7 +102,65 @@ export default async function GamePage({ params }: Props) {
                 <dd>{game.publisher}</dd>
               </>
             )}
+            {game.steamAppId && (
+              <>
+                <dt>Loja</dt>
+                <dd>
+                  <a
+                    className="ext-link"
+                    href={`https://store.steampowered.com/app/${game.steamAppId}/`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Ver na Steam <Icon name="external" size={12} />
+                  </a>
+                </dd>
+              </>
+            )}
           </dl>
+        </aside>
+
+        <section className="game-main">
+          <h1 className="game-title">{game.title}</h1>
+          <div className="game-sub">
+            {game.releaseYear && (
+              <Link href={`/games?year=${game.releaseYear}`} className="mono">
+                {game.releaseYear}
+              </Link>
+            )}
+            {game.developer && (
+              <span>
+                por <strong style={{ color: 'var(--text)' }}>{game.developer}</strong>
+              </span>
+            )}
+          </div>
+
+          <div className="game-hud">
+            <div className="game-hud-rating" title={`${stats.ratingCount} ${stats.ratingCount === 1 ? 'nota' : 'notas'}`}>
+              <b>
+                <Icon name="star" size={15} fill /> {formatAvg(stats.ratingAvg)}
+              </b>
+              <span>Nota média</span>
+            </div>
+            <div>
+              <b>{played}</b>
+              <span>Jogaram</span>
+            </div>
+            <div>
+              <b>{stats.statusCounts.PLAYING}</b>
+              <span>Jogando</span>
+            </div>
+            <div>
+              <b>{stats.statusCounts.BACKLOG}</b>
+              <span>Querem jogar</span>
+            </div>
+            <div>
+              <b>{stats.logCount}</b>
+              <span>Registros</span>
+            </div>
+          </div>
+
+          {game.summary && <p className="game-summary">{game.summary}</p>}
 
           {game.friends.length > 0 && (
             <section className="section">
@@ -149,7 +183,18 @@ export default async function GamePage({ params }: Props) {
           <section className="section">
             <SectionHead title="Reviews populares" />
             {game.popularReviews.length === 0 && game.recentReviews.length === 0 ? (
-              <p className="muted">Ninguém escreveu sobre {game.title} ainda. Que tal ser o primeiro?</p>
+              <div className="empty empty-reviews">
+                <Icon name="chat" size={22} />
+                <strong>Nenhuma review ainda</strong>
+                <p>Conte o que achou de {game.title} e seja a primeira voz por aqui.</p>
+                {viewer ? (
+                  <OpenLogButton>Escrever a primeira review</OpenLogButton>
+                ) : (
+                  <Link href={`/login?next=/games/${game.slug}`} className="btn btn-sm">
+                    Entrar para escrever
+                  </Link>
+                )}
+              </div>
             ) : (
               game.popularReviews.map((log) => <Review key={log.id} log={log} showGame={false} canLike={Boolean(viewer)} />)
             )}
@@ -172,6 +217,17 @@ export default async function GamePage({ params }: Props) {
                   <ListCard key={l.id} list={l} />
                 ))}
               </div>
+            </section>
+          )}
+
+          {game.similar.length > 0 && (
+            <section className="section">
+              <SectionHead title="Jogos parecidos" />
+              <Slider label="Jogos parecidos">
+                {game.similar.map((g) => (
+                  <Poster key={g.id} game={g} />
+                ))}
+              </Slider>
             </section>
           )}
 

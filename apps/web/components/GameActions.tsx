@@ -10,7 +10,7 @@ import {
   type UserGameState,
 } from '@savepoint/shared';
 import Link from 'next/link';
-import { useState, useTransition, type CSSProperties } from 'react';
+import { useEffect, useState, useTransition, type CSSProperties, type ReactNode } from 'react';
 import { addToListAction, removeFromLibraryAction, saveLibraryAction, toggleFavoriteAction } from '@/app/actions';
 import { Icon, STATUS_COLOR, STATUS_ICON } from './Icon';
 import { LogDialog } from './LogDialog';
@@ -26,6 +26,17 @@ const EMPTY: UserGameState = {
   startedAt: null,
   finishedAt: null,
 };
+
+const OPEN_LOG_EVENT = 'sp:open-log';
+
+/** Abre o diálogo de registro/review do painel de ações a partir de outro ponto da página. */
+export function OpenLogButton({ children }: { children: ReactNode }) {
+  return (
+    <button type="button" className="btn btn-sm" onClick={() => window.dispatchEvent(new Event(OPEN_LOG_EVENT))}>
+      <Icon name="edit" size={14} /> {children}
+    </button>
+  );
+}
 
 /** Painel lateral da página do jogo: status, nota, like, favorito, diário e listas. */
 export function GameActions({
@@ -47,6 +58,12 @@ export function GameActions({
   const [logOpen, setLogOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
   const [pending, start] = useTransition();
+
+  useEffect(() => {
+    const open = () => setLogOpen(true);
+    window.addEventListener(OPEN_LOG_EVENT, open);
+    return () => window.removeEventListener(OPEN_LOG_EVENT, open);
+  }, []);
 
   if (!loggedIn) {
     return (
@@ -92,6 +109,26 @@ export function GameActions({
       if (!res.ok) setError(res.error);
       else setNotice(res.data.added ? 'Adicionado à lista ✓' : 'Já estava nessa lista');
     });
+  }
+
+  /** Compartilhamento nativo no celular; no desktop, copia o link. */
+  async function share() {
+    const url = `${window.location.origin}/games/${game.slug}`;
+    setError(null);
+    if (navigator.share && window.matchMedia('(hover: none)').matches) {
+      try {
+        await navigator.share({ title: `${game.title} · Savepoint`, url });
+      } catch {
+        /* cancelado pelo usuário */
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setNotice('Link copiado ✓');
+    } catch {
+      setError('Não foi possível copiar o link');
+    }
   }
 
   const hasEntry = state.status || state.rating || state.liked || state.favoriteRank;
@@ -191,11 +228,13 @@ export function GameActions({
         </div>
       )}
 
-      <button type="button" className="actions-link" onClick={() => setLogOpen(true)}>
-        <strong>Registrar no diário ou escrever review…</strong>
-      </button>
+      <div className="actions-block">
+        <button type="button" className="btn btn-primary btn-block" onClick={() => setLogOpen(true)}>
+          <Icon name="edit" size={15} /> Registrar ou escrever review
+        </button>
+      </div>
       <button type="button" className="actions-link" onClick={() => setListOpen((v) => !v)} aria-expanded={listOpen}>
-        Adicionar a uma lista…
+        <Icon name="list" size={14} /> Adicionar a uma lista…
       </button>
       {listOpen && (
         <div className="actions-block" style={{ display: 'grid', gap: 4 }}>
@@ -209,6 +248,9 @@ export function GameActions({
           </Link>
         </div>
       )}
+      <button type="button" className="actions-link" onClick={share}>
+        <Icon name="share" size={14} /> Compartilhar
+      </button>
       {hasEntry && (
         <button
           type="button"

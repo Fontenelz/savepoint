@@ -122,6 +122,8 @@ export interface GameDetail extends GameSummary {
   publisher: string | null;
   avgHours: number | null;
   backdropUrl: string | null;
+  /** Para o link "Ver na Steam". */
+  steamAppId: string | null;
   source: CatalogSource;
   genres: Genre[];
   platformList: Platform[];
@@ -142,6 +144,8 @@ export interface GameDetail extends GameSummary {
   recentReviews: LogView[];
   lists: ListSummary[];
   friends: FriendEntry[];
+  /** Jogos parecidos (gêneros e plataformas em comum). */
+  similar: GameSummary[];
 }
 
 export interface ProfileCounts {

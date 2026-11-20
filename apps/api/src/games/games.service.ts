@@ -75,6 +75,7 @@ export class GamesService {
         publisher: true,
         avgHours: true,
         backdropUrl: true,
+        steamAppId: true,
         source: true,
         ratingCount: true,
         playerCount: true,
@@ -90,7 +91,7 @@ export class GamesService {
     if (!game) throw new NotFoundException('Jogo não encontrado');
 
     const reviewWhere = { gameId: game.id, review: { not: null } };
-    const [ratingGroups, statusGroups, hours, listCount, logCount, popular, recent, lists, viewer, friends] =
+    const [ratingGroups, statusGroups, hours, listCount, logCount, popular, recent, lists, viewer, friends, similar] =
       await Promise.all([
         this.prisma.userGame.groupBy({
           by: ['rating'],
@@ -140,6 +141,11 @@ export class GamesService {
               select: { status: true, rating: true, liked: true, user: { select: userSummarySelect } },
             })
           : [],
+        this.similar(
+          game.id,
+          game.genres.map((g) => g.id),
+          game.platforms.map((p) => p.id),
+        ),
       ]);
 
     const histogram = Array.from({ length: 10 }, () => 0);
@@ -157,6 +163,7 @@ export class GamesService {
       publisher: game.publisher,
       avgHours: game.avgHours,
       backdropUrl: game.backdropUrl,
+      steamAppId: game.steamAppId,
       source: game.source,
       genres: game.genres,
       platformList: game.platforms,
@@ -177,7 +184,38 @@ export class GamesService {
       recentReviews: recent.filter((r) => !popularIds.has(r.id)).map(toLogView),
       lists: lists.map(toListSummary),
       friends,
+      similar,
     };
+  }
+
+  /**
+   * Jogos parecidos: pontua os candidatos que dividem algum gênero (2 pontos por gênero em comum,
+   * 1 por plataforma) e desempata pela popularidade. Sem gêneros, não há base para comparar.
+   */
+  private async similar(gameId: string, genreIds: string[], platformIds: string[]): Promise<GameSummary[]> {
+    if (!genreIds.length) return [];
+    const candidates = await this.prisma.game.findMany({
+      where: { id: { not: gameId }, genres: { some: { id: { in: genreIds } } } },
+      orderBy: [{ playerCount: 'desc' }, { ratingCount: 'desc' }],
+      take: 80,
+      select: { id: true, genres: { select: { id: true } }, platforms: { select: { id: true } } },
+    });
+    const genres = new Set(genreIds);
+    const platforms = new Set(platformIds);
+    // `candidates` já vem por popularidade; o sort é estável, então o empate mantém essa ordem.
+    const ids = candidates
+      .map((c) => ({
+        id: c.id,
+        score:
+          2 * c.genres.filter((g) => genres.has(g.id)).length + c.platforms.filter((p) => platforms.has(p.id)).length,
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 12)
+      .map((c) => c.id);
+    if (!ids.length) return [];
+    const rows = await this.prisma.game.findMany({ where: { id: { in: ids } }, select: gameSummarySelect });
+    const byId = new Map(rows.map((r) => [r.id, toGameSummary(r)]));
+    return ids.flatMap((id) => byId.get(id) ?? []);
   }
 
   async create(input: CreateGameInput, userId: string): Promise<GameSummary> {

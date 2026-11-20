@@ -28,6 +28,7 @@ const PATHS = {
   pulse: 'M3 12h4l3-8 4 16 3-8h4',
   download: 'M12 4v12M6 10l6 6 6-6M4 20h16',
   chat: 'M4 5h16v11H9l-5 4z',
+  share: 'M12 15V3M7.5 7.5L12 3l4.5 4.5M8 11H5v10h14V11h-3',
 } as const;
 
 export type IconName = keyof typeof PATHS;
