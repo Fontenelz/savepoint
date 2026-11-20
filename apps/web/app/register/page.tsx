@@ -4,7 +4,7 @@ import { AuthArt } from '@/components/AuthArt';
 import { RegisterForm } from '@/components/forms';
 import { getViewer } from '@/lib/session';
 
-export const metadata: Metadata = { title: 'Criar conta' };
+export const metadata: Metadata = { title: 'Criar conta', robots: { index: false, follow: true } };
 
 export default async function RegisterPage() {
   if (await getViewer()) redirect('/');

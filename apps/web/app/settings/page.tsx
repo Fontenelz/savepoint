@@ -6,7 +6,8 @@ import { ProfileForm } from '@/components/forms';
 import { api } from '@/lib/api';
 import { getViewer } from '@/lib/session';
 
-export const metadata: Metadata = { title: 'Editar perfil' };
+// Página pessoal: fora da busca.
+export const metadata: Metadata = { title: 'Editar perfil', robots: { index: false, follow: false } };
 
 export default async function SettingsPage() {
   const viewer = await getViewer();

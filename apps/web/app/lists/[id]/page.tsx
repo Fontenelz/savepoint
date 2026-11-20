@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Empty, Poster, UserLink } from '@/components/bits';
 import { Icon } from '@/components/Icon';
 import { api, apiOrNotFound } from '@/lib/api';
+import { metaDescription, publicPageMeta } from '@/lib/site';
 import { relativeTime } from '@/lib/format';
 
 type Props = { params: Promise<{ id: string }> };
@@ -11,7 +12,15 @@ type Props = { params: Promise<{ id: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   try {
-    return { title: (await api<ListDetail>(`/lists/${id}`)).title };
+    const list = await api<ListDetail>(`/lists/${id}`);
+    const resumo = `Lista de ${list.itemCount} ${list.itemCount === 1 ? 'jogo' : 'jogos'} por @${list.user.username} no Savepoint.`;
+    return publicPageMeta({
+      title: list.title,
+      description: metaDescription(list.description ? `${list.description} · ${resumo}` : resumo),
+      path: `/lists/${list.id}`,
+      ownImage: true,
+      type: 'article',
+    });
   } catch {
     return { title: 'Lista' };
   }

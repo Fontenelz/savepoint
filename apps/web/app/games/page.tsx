@@ -1,13 +1,18 @@
 import type { CatalogMeta, GameSummary, Paginated, ViewerGameMark } from '@savepoint/shared';
 import { formatAvg } from '@savepoint/shared';
 import type { Metadata } from 'next';
+import { publicPageMeta } from '@/lib/site';
 import Link from 'next/link';
 import { Empty, Pagination, Poster, Stars } from '@/components/bits';
 import { Icon } from '@/components/Icon';
 import { getViewer } from '@/lib/session';
 import { api } from '@/lib/api';
 
-export const metadata: Metadata = { title: 'Jogos' };
+export const metadata: Metadata = publicPageMeta({
+  title: 'Jogos',
+  description: 'Catálogo de jogos do Savepoint: veja notas da comunidade, quem está jogando e monte sua estante.',
+  path: '/games',
+});
 
 type Search = { q?: string; genre?: string; platform?: string; sort?: string; page?: string };
 

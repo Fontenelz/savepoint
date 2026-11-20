@@ -5,7 +5,8 @@ import { ExternalImport, GameForm } from '@/components/forms';
 import { api } from '@/lib/api';
 import { getViewer } from '@/lib/session';
 
-export const metadata: Metadata = { title: 'Cadastrar jogo' };
+// Página pessoal: fora da busca.
+export const metadata: Metadata = { title: 'Cadastrar jogo', robots: { index: false, follow: false } };
 
 export default async function NewGamePage() {
   const viewer = await getViewer();

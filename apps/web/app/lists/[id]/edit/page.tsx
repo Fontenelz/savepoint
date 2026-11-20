@@ -5,7 +5,8 @@ import { ListBuilder } from '@/components/ListBuilder';
 import { apiOrNotFound } from '@/lib/api';
 import { getViewer } from '@/lib/session';
 
-export const metadata: Metadata = { title: 'Editar lista' };
+// Página pessoal: fora da busca.
+export const metadata: Metadata = { title: 'Editar lista', robots: { index: false, follow: false } };
 
 export default async function EditListPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

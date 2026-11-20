@@ -5,7 +5,7 @@ import { LoginForm } from '@/components/forms';
 import { GOOGLE_ERRORS } from '@/lib/auth';
 import { getViewer } from '@/lib/session';
 
-export const metadata: Metadata = { title: 'Entrar' };
+export const metadata: Metadata = { title: 'Entrar', robots: { index: false, follow: true } };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; error?: string }> }) {
   if (await getViewer()) redirect('/');

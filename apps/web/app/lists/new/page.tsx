@@ -5,7 +5,8 @@ import { ListBuilder } from '@/components/ListBuilder';
 import { api } from '@/lib/api';
 import { getViewer } from '@/lib/session';
 
-export const metadata: Metadata = { title: 'Nova lista' };
+// Página pessoal: fora da busca.
+export const metadata: Metadata = { title: 'Nova lista', robots: { index: false, follow: false } };
 
 export default async function NewListPage({ searchParams }: { searchParams: Promise<{ add?: string }> }) {
   const viewer = await getViewer();

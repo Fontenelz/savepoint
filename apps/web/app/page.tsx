@@ -1,4 +1,5 @@
 import { PLAY_STATUS_VERB, type HomeData, type QueueData } from '@savepoint/shared';
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Avatar, CoverWall, ListCard, Poster, SectionHead, Stars } from '@/components/bits';
 import { Icon } from '@/components/Icon';
@@ -7,6 +8,11 @@ import { TopRanking } from '@/components/TopRanking';
 import { Review } from '@/components/Review';
 import { api } from '@/lib/api';
 import { getViewer } from '@/lib/session';
+import { SITE_DESCRIPTION, publicPageMeta } from '@/lib/site';
+
+const homeMeta = publicPageMeta({ title: 'Savepoint — seu diário de jogos', description: SITE_DESCRIPTION, path: '/', ownImage: true });
+// Título absoluto: o template do layout ("%s · Savepoint") repetiria o nome.
+export const metadata: Metadata = { ...homeMeta, title: { absolute: homeMeta.title } };
 
 export default async function HomePage() {
   const [viewer, home] = await Promise.all([getViewer(), api<HomeData>('/home')]);
