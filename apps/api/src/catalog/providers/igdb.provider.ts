@@ -106,9 +106,12 @@ export class IgdbProvider implements CatalogProvider, ArtworkSource {
         ),
       ];
       for (const g of games) out.set(String(g.id), { slug: g.slug, steamAppId: null, hours: null });
+      // Um jogo do IGDB pode ter vários ids da Steam (demo, pacote, relançamento): fica o menor,
+      // que é a página original (ex.: Portal = 400, não 52003).
       for (const s of steam) {
         const d = out.get(String(s.game));
-        if (d && !d.steamAppId && /^\d+$/.test(s.uid)) d.steamAppId = s.uid;
+        if (!d || !/^\d+$/.test(s.uid)) continue;
+        if (!d.steamAppId || Number(s.uid) < Number(d.steamAppId)) d.steamAppId = s.uid;
       }
       for (const t of times) {
         const d = out.get(String(t.game_id));
