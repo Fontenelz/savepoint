@@ -11,8 +11,10 @@ function runtimeUrl(): string | undefined {
   const pooled = process.env.DATABASE_URL_POOLED;
   if (!pooled) return undefined;
   const url = new URL(pooled);
-  // Poolers em modo transação não suportam prepared statements.
-  url.searchParams.set('pgbouncer', 'true');
+  // Sem `pgbouncer=true`: o pooler do Prisma Postgres (PgBouncer recente) já trata prepared statements.
+  // Com a opção, o Prisma embrulha cada consulta em BEGIN/DEALLOCATE/COMMIT (~4x mais idas ao banco)
+  // e, em partidas a frio, conexões ficaram presas em "idle in transaction", esgotando o pool.
+  url.searchParams.delete('pgbouncer');
   // Poucas conexões por instância: o pooler é quem distribui entre as instâncias.
   if (!url.searchParams.has('connection_limit')) url.searchParams.set('connection_limit', '5');
   return url.toString();
