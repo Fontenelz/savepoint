@@ -3234,3 +3234,260 @@ a.chip:hover {
 .thread-form .textarea {
   min-height: 64px;
 }
+
+/* ==========================================================================
+   Configurações → Steam
+   ========================================================================== */
+.settings-link {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  max-width: 480px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--bg-2);
+  font-size: 14px;
+}
+
+.settings-link:hover {
+  border-color: var(--line-2);
+  background: var(--surface);
+}
+
+.steam-back {
+  display: inline-block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.steam-back:hover {
+  color: var(--text);
+}
+
+.steam-page .form-error,
+.steam-page > .notice {
+  margin-top: 20px;
+}
+
+.steam-ok {
+  border-color: rgb(198 255 61 / 0.35);
+  color: var(--text);
+}
+
+.steam-points {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 24px;
+  padding-left: 18px;
+  color: var(--text-2);
+  font-size: 14px;
+  max-width: 560px;
+}
+
+.steam-account {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  margin-top: 28px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--bg-2);
+}
+
+.steam-avatar {
+  border-radius: var(--radius);
+  display: block;
+}
+
+.steam-account-info {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.steam-account-info strong {
+  font-size: 16px;
+}
+
+.steam-profile-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--info);
+  width: fit-content;
+}
+
+.steam-import {
+  margin-top: 28px;
+}
+
+.steam-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.steam-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+  background: var(--bg-2);
+}
+
+.steam-row:first-child {
+  border-top: 0;
+}
+
+.steam-capsule {
+  display: block;
+  width: 92px;
+  aspect-ratio: 184 / 69;
+  object-fit: cover;
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.steam-info {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.steam-name {
+  font-weight: 600;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.steam-name a:hover {
+  color: var(--accent);
+}
+
+.steam-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.steam-tag {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgb(92 200 255 / 0.12);
+  color: var(--info);
+  font-size: 11px;
+}
+
+/* Status sugerido (tracejado) ou já na estante (sólido) */
+.steam-state {
+  padding: 3px 8px;
+  border: 1px dashed var(--line-2);
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.steam-state.is-shelf {
+  border-style: solid;
+  border-color: rgb(198 255 61 / 0.35);
+  color: var(--accent);
+}
+
+.steam-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  font-size: 14px;
+}
+
+.steam-progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  font-size: 13px;
+}
+
+.steam-bar {
+  flex: 1 1 200px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.steam-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.steam-summary {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
+.steam-summary p {
+  margin: 0;
+}
+
+.steam-summary details ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.steam-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 760px) {
+  .steam-row {
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .steam-capsule {
+    width: 64px;
+  }
+
+  .steam-account {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .steam-account > .btn {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}

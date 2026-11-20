@@ -222,3 +222,49 @@ export interface CatalogMeta {
   genres: Genre[];
   platforms: Platform[];
 }
+
+// ─── Steam ───────────────────────────────────────────────────────────────────
+
+export interface SteamAccount {
+  steamId: string;
+  name: string | null;
+  avatarUrl: string | null;
+  profileUrl: string;
+  linkedAt: string;
+  syncedAt: string | null;
+}
+
+export interface SteamLibraryItem {
+  appId: string;
+  name: string;
+  /** Minutos jogados (total da conta). */
+  minutes: number;
+  /** Jogou nas últimas 2 semanas. */
+  recent: boolean;
+  lastPlayedAt: string | null;
+  /** Imagem da loja, só para a prévia (não é salva). */
+  imageUrl: string;
+  /** Jogo correspondente no catálogo (pelo app id da Steam), se já existir. */
+  game: GameSummary | null;
+  /** Estado atual na estante do usuário, se o jogo já estiver lá. */
+  entry: { status: PlayStatus | null; hoursPlayed: number | null } | null;
+  /** Status sugerido para a importação (null = só as horas). */
+  suggestedStatus: PlayStatus | null;
+}
+
+export interface SteamLibrary {
+  account: SteamAccount;
+  /** Perfil com "Detalhes do jogo" privado: a Steam não devolve a biblioteca. */
+  private: boolean;
+  items: SteamLibraryItem[];
+}
+
+export interface SteamImportResult {
+  /** Jogos adicionados à estante. */
+  added: number;
+  /** Jogos que já estavam na estante (horas atualizadas). */
+  updated: number;
+  /** Jogos novos criados no catálogo a partir da loja da Steam. */
+  createdGames: number;
+  skipped: { appId: string; reason: string }[];
+}

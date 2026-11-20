@@ -25,6 +25,7 @@ enum CatalogSource {
   LOCAL
   COMMUNITY
   IGDB
+  STEAM
 }
 
 model User {
@@ -36,6 +37,13 @@ model User {
   bio          String?
   avatarHue    Int      @default(200)
   createdAt    DateTime @default(now())
+
+  /// Conta Steam vinculada (SteamID64), para importar biblioteca e horas.
+  steamId       String?   @unique
+  steamName     String?
+  steamAvatar   String?
+  steamLinkedAt DateTime?
+  steamSyncedAt DateTime?
 
   library      UserGame[]
   logs         LogEntry[]
@@ -84,6 +92,7 @@ model Game {
   listItems ListItem[]
 
   @@unique([source, externalId])
+  @@index([steamAppId])
   @@index([playerCount])
   @@index([ratingAvg])
 }

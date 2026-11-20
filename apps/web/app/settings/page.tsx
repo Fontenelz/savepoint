@@ -1,5 +1,6 @@
 import type { Profile } from '@savepoint/shared';
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { ProfileForm } from '@/components/forms';
 import { api } from '@/lib/api';
@@ -22,6 +23,12 @@ export default async function SettingsPage() {
       </div>
       <div className="section">
         <ProfileForm user={profile.user} />
+      </div>
+      <div className="section">
+        <Link href="/settings/steam" className="settings-link">
+          <strong>Steam</strong>
+          <span className="muted">Importe sua biblioteca e suas horas de jogo</span>
+        </Link>
       </div>
     </div>
   );

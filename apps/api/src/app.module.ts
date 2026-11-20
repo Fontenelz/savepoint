@@ -7,6 +7,7 @@ import { GamesModule } from './games/games.module';
 import { LibraryModule } from './library/library.module';
 import { ListsModule } from './lists/lists.module';
 import { LogsModule } from './logs/logs.module';
+import { SteamModule } from './steam/steam.module';
 import { UsersModule } from './users/users.module';
 
 @Controller('health')
@@ -28,6 +29,7 @@ class HealthController {
     ListsModule,
     UsersModule,
     CatalogModule,
+    SteamModule,
   ],
   controllers: [HealthController],
 })

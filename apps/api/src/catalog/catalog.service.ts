@@ -238,7 +238,7 @@ export class CatalogService {
     return report;
   }
 
-  private async upsertGenres(ext: ExternalGame) {
+  async upsertGenres(ext: Pick<ExternalGame, 'genres'>) {
     const ids: string[] = [];
     for (const name of ext.genres) {
       const slug = slugify(name);
@@ -249,7 +249,7 @@ export class CatalogService {
     return ids;
   }
 
-  private async upsertPlatforms(ext: ExternalGame) {
+  async upsertPlatforms(ext: Pick<ExternalGame, 'platforms'>) {
     const ids: string[] = [];
     for (const p of ext.platforms) {
       // Tenta casar com plataformas já cadastradas pelo nome curto ou completo.

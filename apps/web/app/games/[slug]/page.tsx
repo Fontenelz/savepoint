@@ -1,4 +1,4 @@
-import { PLAY_STATUS_LABEL, formatHours, type GameDetail, type ListSummary } from '@savepoint/shared';
+import { PLAY_STATUS_LABEL, formatHours, type CatalogSource, type GameDetail, type ListSummary } from '@savepoint/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Avatar, Histogram, ListCard, SectionHead, ShelfBar, Stars } from '@/components/bits';
@@ -21,7 +21,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-const SOURCE_LABEL = { LOCAL: 'catálogo curado', COMMUNITY: 'cadastrado pela comunidade', IGDB: 'importado do IGDB' };
+const SOURCE_LABEL: Record<CatalogSource, string> = {
+  LOCAL: 'catálogo curado',
+  COMMUNITY: 'cadastrado pela comunidade',
+  IGDB: 'importado do IGDB',
+  STEAM: 'importado da Steam',
+};
 
 export default async function GamePage({ params }: Props) {
   const { slug } = await params;

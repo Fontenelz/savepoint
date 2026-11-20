@@ -10,6 +10,8 @@ import {
   type LibraryEntryInput,
   type ListInput,
   type ReviewComment,
+  type SteamImportInput,
+  type SteamImportResult,
   type LogEntryInput,
   type UserGameState,
 } from '@savepoint/shared';
@@ -200,4 +202,16 @@ export async function importExternalAction(externalId: string) {
   const res = await run(() => api<{ slug: string }>('/catalog/import', { method: 'POST', json: { externalId } }));
   if (!res.ok) return res;
   redirect(`/games/${res.data.slug}`);
+}
+
+// ─── Steam ───────────────────────────────────────────────────────────────────
+
+export async function importSteamAction(items: SteamImportInput['items']) {
+  return run(() => api<SteamImportResult>('/steam/import', { method: 'POST', json: { items } }));
+}
+
+export async function unlinkSteamAction() {
+  const res = await run(() => api('/steam/link', { method: 'DELETE' }));
+  revalidatePath('/settings/steam');
+  return res;
 }

@@ -116,3 +116,28 @@ export const gameIdsQuerySchema = z.object({
     .transform((v) => v.split(',').map((x) => x.trim()).filter(Boolean))
     .pipe(z.array(z.string()).max(100)),
 });
+
+// ─── Steam ───────────────────────────────────────────────────────────────────
+
+/** Jogos importados por requisição (cada jogo novo baixa dados e imagens; cabe no limite da função). */
+export const STEAM_IMPORT_BATCH = 5;
+
+/** Parâmetros `openid.*` devolvidos pela Steam no retorno do login. */
+export const steamLinkSchema = z.object({
+  params: z.record(z.string().regex(/^openid\.[a-z_.]+$/), z.string().max(2000)),
+});
+export type SteamLinkInput = z.infer<typeof steamLinkSchema>;
+
+export const steamImportSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        appId: z.string().regex(/^\d{1,10}$/),
+        /** Status para jogos novos na estante (null = só as horas). Não altera status já definido. */
+        status: z.enum(PLAY_STATUSES).nullable(),
+      }),
+    )
+    .min(1)
+    .max(STEAM_IMPORT_BATCH),
+});
+export type SteamImportInput = z.infer<typeof steamImportSchema>;

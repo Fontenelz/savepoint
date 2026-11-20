@@ -76,8 +76,8 @@ Env: `apps/api/.env` (DATABASE_URL, JWT_SECRET, IGDB opcional) e `apps/web/.env.
 - [x] Limite de tentativas de login (8 erros/15 min por conta, guardado no banco — `LoginThrottle`).
 - [ ] Upload de foto de perfil (hoje todos usam a silhueta).
 - [ ] Imagens faltando: *Final Fantasy VII Remake* e *Horizon Chase Turbo* (download bloqueado/limitado na rede da empresa — rodar `pnpm catalog:sync` fora dela); *Minecraft* não tem capa na Wikipedia. Exclusivos de console não têm banner (vem da Steam).
-- [ ] Importar biblioteca e horas da Steam (o `steamAppId` já é salvo nos jogos).
+- [x] Importar biblioteca e horas da Steam: Configurações → Steam (OpenID + `STEAM_API_KEY`), importação automática em lotes ao conectar (`SteamModule`). Também `pnpm catalog:import` (IGDB em massa).
 - [ ] "O que jogo agora?" — sugestão do backlog pelo tempo disponível.
 - [ ] Retrospectiva anual compartilhável; comentários em reviews; notificações.
-- [ ] **Deploy na Vercel** (código pronto, ver `DEPLOY.md`): site e API como dois projetos, Prisma Postgres + Vercel Blob. Falta: repositório no GitHub, criar os projetos e validar o 1º deploy real (inclusão do binário do Prisma, pnpm 12 via corepack).
+- [x] **Deploy na Vercel** (ver `DEPLOY.md`): `savepoint-api` (https://savepoint-api.vercel.app/api) e `savepoint-web` (https://savepoint-web-taupe.vercel.app), Prisma Postgres + Vercel Blob, deploy automático a cada push na `main`.
 - [ ] Acesso pelo celular físico: exige `portproxy` + regra de firewall no Windows (WSL2) — ver histórico/README; rede da empresa pode bloquear.

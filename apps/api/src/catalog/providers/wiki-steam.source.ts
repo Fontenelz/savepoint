@@ -20,7 +20,7 @@ const MAX_RETRIES = 6;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Ordem de tentativa dos CDNs da Steam (redes corporativas costumam bloquear só alguns). */
-const STEAM_HOSTS = [
+export const STEAM_HOSTS = [
   'steamcdn-a.akamaihd.net',
   'cdn.cloudflare.steamstatic.com',
   'cdn.akamai.steamstatic.com',
