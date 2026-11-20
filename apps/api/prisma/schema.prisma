@@ -26,6 +26,7 @@ enum CatalogSource {
   COMMUNITY
   IGDB
   STEAM
+  RAWG
 }
 
 model User {
@@ -68,6 +69,8 @@ model Game {
   backdropUrl String?
   /// Vínculo com o IGDB (preenchido por importação ou pelo catalog:sync).
   igdbId      String?       @unique
+  /// Slug na RAWG (importação em massa; também é a chave da propriedade P9968 do Wikidata).
+  rawgId      String?       @unique
   /// IDs abertos descobertos via Wikidata (o Steam também habilita importar bibliotecas no futuro).
   wikidataId  String?
   steamAppId  String?

@@ -4,8 +4,9 @@ import { AppModule } from '../app.module';
 import { CatalogDetailsService } from './details.service';
 
 /**
- * Completa os jogos que têm id do IGDB: app id da Steam, tempo médio para zerar
- * e sinopse em português (loja da Steam → Wikipedia) para os importados do IGDB.
+ * Junta gêneros duplicados (inglês × português) e completa os jogos importados (IGDB/RAWG):
+ * app id da Steam e tempo médio para zerar (IGDB, se configurado) e sinopse em português
+ * (loja da Steam → Wikipedia).
  * Só preenche o que está vazio; pode rodar quantas vezes quiser.
  *
  * pnpm catalog:enrich
@@ -13,13 +14,19 @@ import { CatalogDetailsService } from './details.service';
 async function main() {
   const app = await NestFactory.createApplicationContext(AppModule, { logger: ['error', 'warn'] });
   const details = app.get(CatalogDetailsService);
-  if (!details.isEnabled()) {
-    console.error('✗ Defina IGDB_CLIENT_ID e IGDB_CLIENT_SECRET (https://api-docs.igdb.com/#account-creation).');
-    await app.close();
-    process.exit(1);
+  const genres = await details.normalizeGenres();
+  if (genres.merged.length || genres.removed.length) {
+    console.log('\n🏷  Gêneros');
+    for (const m of genres.merged) console.log(`  ↪ ${m}`);
+    if (genres.removed.length) console.log(`  ✗ removidos (não são gênero): ${genres.removed.join(', ')}`);
+  }
+  const platforms = await details.normalizePlatforms();
+  if (platforms.length) {
+    console.log('\n🕹  Plataformas');
+    for (const m of platforms) console.log(`  ↪ ${m}`);
   }
 
-  console.log('\n🧩 Completando dados do catálogo (IGDB → Steam → Wikipedia)\n');
+  console.log('\n🧩 Completando dados do catálogo (IGDB/RAWG → Steam → Wikipedia)\n');
   const results = await details.enrich({
     onProgress: (r, i, total) => {
       const marks = [

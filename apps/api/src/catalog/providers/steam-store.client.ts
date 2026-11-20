@@ -31,6 +31,19 @@ export function plainText(html: string | null | undefined, max = 2000) {
   return text ? text.slice(0, max) : null;
 }
 
+const PT_WORDS = /\b(de|um|uma|que|para|com|seu|sua|não|você|em|os|as|dos|das|é)\b/gi;
+const EN_WORDS = /\b(the|and|of|to|your|with|you|is|in|for|an|its)\b/gi;
+
+/**
+ * A loja devolve o texto em inglês quando o jogo não tem tradução, mesmo pedindo português.
+ * Compara palavras comuns de cada idioma (suficiente para sinopses curtas).
+ */
+export function looksPortuguese(text: string) {
+  const pt = text.match(PT_WORDS)?.length ?? 0;
+  const en = text.match(EN_WORDS)?.length ?? 0;
+  return pt > en;
+}
+
 /**
  * API pública da loja da Steam (sem chave): dados do jogo em português.
  * Usada para criar jogos na importação de bibliotecas e para traduzir sinopses do catálogo.

@@ -5,6 +5,8 @@ import { MediaService } from '../core/media.service';
 import { PrismaService } from '../core/prisma.service';
 import { GamesService } from '../games/games.service';
 import { CatalogDetailsService } from './details.service';
+import { canonicalGenre, canonicalPlatform } from './taxonomy';
+import type { RawgImport } from './providers/rawg.provider';
 import { ARTWORK_SOURCES, type ArtworkSource } from './providers/artwork-source';
 import { CATALOG_PROVIDERS, matchScore, type CatalogProvider, type ExternalGame } from './providers/catalog-provider';
 
@@ -89,7 +91,7 @@ export class CatalogService {
     const existing = await this.prisma.game.findUnique({ where: { igdbId: ext.externalId }, select: { slug: true } });
     if (existing) return { slug: existing.slug, status: 'exists' };
 
-    const local = await this.findLocalMatch(ext);
+    const local = await this.findLocalMatch(ext, 'igdbId');
     if (local) {
       await this.prisma.game.update({ where: { id: local.id }, data: { igdbId: ext.externalId } });
       return { slug: local.slug, status: 'linked' };
@@ -125,10 +127,63 @@ export class CatalogService {
     return { slug, status: 'created' };
   }
 
-  /** Jogo local sem id do IGDB com o mesmo título e ano (ex.: os jogos curados do seed). */
-  private async findLocalMatch(ext: ExternalGame) {
+  /**
+   * Importa um jogo da RAWG. Idempotente: um jogo já existente (pelo slug da RAWG, pelo app id
+   * da Steam ou pelo mesmo título + ano) só ganha o vínculo com a RAWG.
+   */
+  async importRawg(r: RawgImport): Promise<{ slug: string; status: 'created' | 'linked' | 'exists' }> {
+    const existing = await this.prisma.game.findUnique({ where: { rawgId: r.slug }, select: { slug: true } });
+    if (existing) return { slug: existing.slug, status: 'exists' };
+
+    const local =
+      (r.steamAppId
+        ? await this.prisma.game.findFirst({
+            where: { steamAppId: r.steamAppId, rawgId: null },
+            select: { id: true, slug: true },
+          })
+        : null) ?? (await this.findLocalMatch(r.ext, 'rawgId'));
+    if (local) {
+      await this.prisma.game.update({ where: { id: local.id }, data: { rawgId: r.slug } });
+      return { slug: local.slug, status: 'linked' };
+    }
+
+    const ext = r.ext;
+    const [genreIds, platformIds] = await Promise.all([this.upsertGenres(ext), this.upsertPlatforms(ext)]);
+    const slug = await this.games.uniqueSlug(ext.title, ext.releaseYear);
+    const steamTaken = r.steamAppId
+      ? await this.prisma.game.findFirst({ where: { steamAppId: r.steamAppId }, select: { id: true } })
+      : null;
+
+    const created = await this.prisma.game.create({
+      select: { id: true },
+      data: {
+        slug,
+        title: ext.title,
+        summary: ext.summary,
+        releaseYear: ext.releaseYear,
+        developer: ext.developer,
+        publisher: ext.publisher,
+        backdropUrl: ext.backdropUrl,
+        // Média de horas jogadas na RAWG: melhor que nada até haver o tempo para zerar.
+        avgHours: r.playtime,
+        source: 'RAWG',
+        externalId: ext.externalId,
+        rawgId: r.slug,
+        steamAppId: steamTaken ? null : r.steamAppId,
+        genres: { connect: genreIds.map((id) => ({ id })) },
+        platforms: { connect: platformIds.map((id) => ({ id })) },
+      },
+    });
+    // Capa (a RAWG não tem capa vertical) e banner copiados para o nosso armazenamento.
+    await this.enrichGame(slug).catch(() => undefined);
+    await this.details.enrich({ gameIds: [created.id] }).catch(() => undefined);
+    return { slug, status: 'created' };
+  }
+
+  /** Jogo local ainda sem vínculo com a fonte, com o mesmo título e ano (ex.: os curados do seed). */
+  private async findLocalMatch(ext: ExternalGame, link: 'igdbId' | 'rawgId') {
     const candidates = await this.prisma.game.findMany({
-      where: { igdbId: null },
+      where: { [link]: null },
       select: { id: true, slug: true, title: true, releaseYear: true },
     });
     return (
@@ -171,6 +226,10 @@ export class CatalogService {
     if (!cover && g.coverUrl && /^https?:\/\//.test(g.coverUrl) && !this.media.isStored(g.coverUrl)) {
       const saved = await this.media.download('covers', g.slug, [g.coverUrl], opts);
       if (saved) data.coverUrl = cover = saved.path;
+    }
+    if (!backdrop && g.backdropUrl && /^https?:\/\//.test(g.backdropUrl) && !this.media.isStored(g.backdropUrl)) {
+      const saved = await this.media.download('backdrops', g.slug, [g.backdropUrl], opts);
+      if (saved) data.backdropUrl = backdrop = saved.path;
     }
 
     // 3) Fontes de arte, em ordem de prioridade, até ter capa e banner.
@@ -244,19 +303,37 @@ export class CatalogService {
   }
 
   async upsertGenres(ext: Pick<ExternalGame, 'genres'>) {
-    const ids: string[] = [];
-    for (const name of ext.genres) {
-      const slug = slugify(name);
-      if (!slug) continue;
-      const g = await this.prisma.genre.upsert({ where: { slug }, create: { slug, name }, update: {}, select: { id: true } });
-      ids.push(g.id);
+    // Nomes em inglês (IGDB/RAWG) e categorias da loja viram os gêneros do catálogo, sem duplicar.
+    const ids = new Set<string>();
+    for (const raw of ext.genres) {
+      const genre = canonicalGenre(raw);
+      if (!genre) continue;
+      const g = await this.prisma.genre.upsert({
+        where: { slug: genre.slug },
+        create: genre,
+        update: {},
+        select: { id: true },
+      });
+      ids.add(g.id);
     }
-    return ids;
+    return [...ids];
   }
 
   async upsertPlatforms(ext: Pick<ExternalGame, 'platforms'>) {
-    const ids: string[] = [];
+    const ids = new Set<string>();
     for (const p of ext.platforms) {
+      // Nomes diferentes para a mesma plataforma (macOS × Mac, iOS/Android × Mobile).
+      const canonical = canonicalPlatform(p);
+      if (canonical) {
+        const target = await this.prisma.platform.upsert({
+          where: { slug: canonical.slug },
+          create: canonical,
+          update: {},
+          select: { id: true },
+        });
+        ids.add(target.id);
+        continue;
+      }
       // Tenta casar com plataformas já cadastradas pelo nome curto ou completo.
       const match = await this.prisma.platform.findFirst({
         where: {
@@ -268,7 +345,7 @@ export class CatalogService {
         select: { id: true },
       });
       if (match) {
-        ids.push(match.id);
+        ids.add(match.id);
         continue;
       }
       const slug = slugify(p.name);
@@ -279,8 +356,8 @@ export class CatalogService {
         update: {},
         select: { id: true },
       });
-      ids.push(created.id);
+      ids.add(created.id);
     }
-    return ids;
+    return [...ids];
   }
 }

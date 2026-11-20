@@ -26,6 +26,7 @@ const SOURCE_LABEL: Record<CatalogSource, string> = {
   COMMUNITY: 'cadastrado pela comunidade',
   IGDB: 'importado do IGDB',
   STEAM: 'importado da Steam',
+  RAWG: 'importado da RAWG',
 };
 
 export default async function GamePage({ params }: Props) {

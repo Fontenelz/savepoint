@@ -3,8 +3,9 @@ import { Prisma } from '@prisma/client';
 import { HttpCacheService } from '../core/http-cache.service';
 import { USER_AGENT } from '../core/media.service';
 import { PrismaService } from '../core/prisma.service';
-import { IgdbProvider } from './providers/igdb.provider';
-import { SteamStoreClient, plainText } from './providers/steam-store.client';
+import { canonicalGenre, canonicalPlatform } from './taxonomy';
+import { IgdbProvider, type IgdbDetails } from './providers/igdb.provider';
+import { SteamStoreClient, looksPortuguese, plainText } from './providers/steam-store.client';
 
 export interface DetailsResult {
   slug: string;
@@ -14,6 +15,9 @@ export interface DetailsResult {
   /** De onde veio a sinopse em português (null = mantida). */
   summary: 'steam' | 'wikipedia' | null;
 }
+
+/** Origens cuja sinopse vem em inglês e pode ser trocada pela versão em português. */
+const IMPORTED = new Set<string>(['IGDB', 'RAWG']);
 
 /** Resumo da Wikipedia: até ~600 caracteres, cortando no fim de uma frase. */
 function shortExtract(text: string) {
@@ -43,15 +47,15 @@ export class CatalogDetailsService {
     private readonly cache: HttpCacheService,
   ) {}
 
-  isEnabled() {
-    return this.igdb.isEnabled();
-  }
 
   async enrich(
     opts: { gameIds?: string[]; onProgress?: (r: DetailsResult, i: number, total: number) => void } = {},
   ): Promise<DetailsResult[]> {
     const games = await this.prisma.game.findMany({
-      where: { igdbId: { not: null }, ...(opts.gameIds ? { id: { in: opts.gameIds } } : {}) },
+      where: {
+        OR: [{ igdbId: { not: null } }, { rawgId: { not: null } }],
+        ...(opts.gameIds ? { id: { in: opts.gameIds } } : {}),
+      },
       orderBy: { title: 'asc' },
       select: {
         id: true,
@@ -60,6 +64,7 @@ export class CatalogDetailsService {
         source: true,
         summary: true,
         igdbId: true,
+        rawgId: true,
         steamAppId: true,
         wikidataId: true,
         avgHours: true,
@@ -67,10 +72,18 @@ export class CatalogDetailsService {
     });
     if (!games.length) return [];
 
-    const details = await this.igdb.details(games.map((g) => g.igdbId!));
-    const needsWiki = games.filter((g) => g.source === 'IGDB' || !g.wikidataId);
-    const wiki = await this.wikiArticles(
-      needsWiki.map((g) => details.get(g.igdbId!)?.slug).filter((s): s is string => Boolean(s)),
+    // IGDB: app id da Steam e tempo para zerar (só com as chaves configuradas).
+    const igdbIds = games.map((g) => g.igdbId).filter((id): id is string => Boolean(id));
+    const details = this.igdb.isEnabled() && igdbIds.length ? await this.igdb.details(igdbIds) : new Map<string, IgdbDetails>();
+    // Wikidata guarda o slug do IGDB (P5794) e o da RAWG (P9968): os dois levam ao artigo em português.
+    const needsWiki = games.filter((g) => IMPORTED.has(g.source) || !g.wikidataId);
+    const byIgdb = await this.wikiArticles(
+      'P5794',
+      needsWiki.map((g) => (g.igdbId ? details.get(g.igdbId)?.slug : undefined)).filter((s): s is string => Boolean(s)),
+    );
+    const byRawg = await this.wikiArticles(
+      'P9968',
+      needsWiki.map((g) => g.rawgId).filter((s): s is string => Boolean(s)),
     );
     const usedSteam = new Set(
       (
@@ -80,8 +93,8 @@ export class CatalogDetailsService {
 
     const results: DetailsResult[] = [];
     for (const [i, g] of games.entries()) {
-      const d = details.get(g.igdbId!);
-      const w = d ? wiki.get(d.slug) : undefined;
+      const d = g.igdbId ? details.get(g.igdbId) : undefined;
+      const w = (d ? byIgdb.get(d.slug) : undefined) ?? (g.rawgId ? byRawg.get(g.rawgId) : undefined);
       const data: Prisma.GameUpdateInput = {};
       const result: DetailsResult = { slug: g.slug, title: g.title, steamAppId: false, avgHours: false, summary: null };
 
@@ -98,10 +111,12 @@ export class CatalogDetailsService {
       }
       if (!g.wikidataId && w) data.wikidataId = w.qid;
 
-      if (g.source === 'IGDB') {
+      if (IMPORTED.has(g.source)) {
         try {
           const store = steamAppId ? await this.store.appDetails(steamAppId) : null;
-          const fromStore = plainText(store?.short_description);
+          // Sem tradução, a loja manda o texto em inglês: nesse caso tenta a Wikipedia.
+          const storeText = plainText(store?.short_description);
+          const fromStore = storeText && looksPortuguese(storeText) ? storeText : null;
           const fromWiki = !fromStore && w?.ptTitle ? await this.ptSummary(w.ptTitle) : null;
           const summary = fromStore ?? fromWiki;
           if (summary && summary !== g.summary) {
@@ -120,8 +135,66 @@ export class CatalogDetailsService {
     return results;
   }
 
-  /** slug do IGDB → item do Wikidata e título do artigo na Wikipedia em português (lotes de 100). */
-  private async wikiArticles(slugs: string[]) {
+  /**
+   * Junta gêneros duplicados criados por importações antigas (ex.: "Adventure" → "Aventura")
+   * e remove categorias que não são gênero ("Gratuitos para Jogar", "Acesso Antecipado").
+   */
+  async normalizeGenres(): Promise<{ merged: string[]; removed: string[] }> {
+    const merged: string[] = [];
+    const removed: string[] = [];
+    const genres = await this.prisma.genre.findMany({ select: { id: true, slug: true, name: true } });
+    for (const g of genres) {
+      const target = canonicalGenre(g.name, g.slug);
+      if (target?.slug === g.slug) continue;
+      if (target) {
+        const into = await this.prisma.genre.upsert({
+          where: { slug: target.slug },
+          create: target,
+          update: {},
+          select: { id: true },
+        });
+        const games = await this.prisma.game.findMany({ where: { genres: { some: { id: g.id } } }, select: { id: true } });
+        for (const game of games) {
+          await this.prisma.game.update({ where: { id: game.id }, data: { genres: { connect: { id: into.id } } } });
+        }
+        merged.push(`${g.name} → ${target.name} (${games.length})`);
+      } else {
+        removed.push(g.name);
+      }
+      // A ligação jogo–gênero (tabela implícita) é apagada junto.
+      await this.prisma.genre.delete({ where: { id: g.id } });
+    }
+    return { merged, removed };
+  }
+
+  /** Junta plataformas duplicadas (ex.: "macOS" → "Mac", "Android"/"iOS" → "iOS / Android"). */
+  async normalizePlatforms(): Promise<string[]> {
+    const merged: string[] = [];
+    const platforms = await this.prisma.platform.findMany({ select: { id: true, slug: true, name: true, short: true } });
+    for (const p of platforms) {
+      const target = canonicalPlatform(p);
+      if (!target || target.slug === p.slug) continue;
+      const into = await this.prisma.platform.upsert({
+        where: { slug: target.slug },
+        create: target,
+        update: {},
+        select: { id: true },
+      });
+      const games = await this.prisma.game.findMany({ where: { platforms: { some: { id: p.id } } }, select: { id: true } });
+      for (const game of games) {
+        await this.prisma.game.update({ where: { id: game.id }, data: { platforms: { connect: { id: into.id } } } });
+      }
+      // Estante e diário guardam a plataforma em que a pessoa jogou: aponta para a canônica.
+      await this.prisma.userGame.updateMany({ where: { platformId: p.id }, data: { platformId: into.id } });
+      await this.prisma.logEntry.updateMany({ where: { platformId: p.id }, data: { platformId: into.id } });
+      await this.prisma.platform.delete({ where: { id: p.id } });
+      merged.push(`${p.name} → ${target.name} (${games.length})`);
+    }
+    return merged;
+  }
+
+  /** slug (IGDB ou RAWG) → item do Wikidata e título do artigo na Wikipedia em português (lotes de 100). */
+  private async wikiArticles(property: 'P5794' | 'P9968', slugs: string[]) {
     const out = new Map<string, { qid: string; ptTitle: string | null }>();
     for (let i = 0; i < slugs.length; i += 100) {
       const values = slugs
@@ -129,7 +202,7 @@ export class CatalogDetailsService {
         .map((s) => JSON.stringify(s))
         .join(' ');
       const query =
-        `SELECT ?slug ?item ?pt WHERE { VALUES ?slug { ${values} } ?item wdt:P5794 ?slug . ` +
+        `SELECT ?slug ?item ?pt WHERE { VALUES ?slug { ${values} } ?item wdt:${property} ?slug . ` +
         `OPTIONAL { ?a schema:about ?item ; schema:isPartOf <https://pt.wikipedia.org/> ; schema:name ?pt } }`;
       type Sparql = { results: { bindings: { slug: { value: string }; item: { value: string }; pt?: { value: string } }[] } };
       const data = await this.json<Sparql>(

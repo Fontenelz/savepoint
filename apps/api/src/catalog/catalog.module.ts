@@ -6,6 +6,7 @@ import { CatalogDetailsService } from './details.service';
 import { ARTWORK_SOURCES } from './providers/artwork-source';
 import { CATALOG_PROVIDERS } from './providers/catalog-provider';
 import { IgdbProvider } from './providers/igdb.provider';
+import { RawgProvider } from './providers/rawg.provider';
 import { SteamStoreClient } from './providers/steam-store.client';
 import { WikiSteamSource } from './providers/wiki-steam.source';
 
@@ -16,6 +17,7 @@ import { WikiSteamSource } from './providers/wiki-steam.source';
     CatalogService,
     CatalogDetailsService,
     IgdbProvider,
+    RawgProvider,
     SteamStoreClient,
     WikiSteamSource,
     // Importação de jogos completos (busca + cadastro).

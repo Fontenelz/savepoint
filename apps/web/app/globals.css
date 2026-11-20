@@ -2319,6 +2319,18 @@ a.chip:hover {
   color: var(--accent);
 }
 
+/* Atribuição exigida pela RAWG: link visível em todas as páginas */
+.footer-credits {
+  display: block;
+  margin-top: 4px;
+}
+
+.footer-credits a {
+  color: var(--text-2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* ==========================================================================
    Responsivo
    ========================================================================== */

@@ -55,6 +55,14 @@ export function SiteFooter() {
       <div className="shell">
         <span>
           <strong style={{ color: 'var(--text-2)' }}>savepoint</strong> — seu diário de jogos. Projeto de portfólio.
+          {' '}
+          <span className="footer-credits">
+            Dados de jogos:{' '}
+            <a href="https://rawg.io" target="_blank" rel="noreferrer">
+              RAWG
+            </a>
+            , IGDB e Steam.
+          </span>
         </span>
         <nav>
           <Link href="/games">Catálogo</Link>

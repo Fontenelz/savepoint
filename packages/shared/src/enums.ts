@@ -43,7 +43,7 @@ export const PLAYED_STATUSES: PlayStatus[] = [
 
 export const FINISHED_STATUSES: PlayStatus[] = ['COMPLETED', 'MASTERED'];
 
-export const CATALOG_SOURCES = ['LOCAL', 'COMMUNITY', 'IGDB', 'STEAM'] as const;
+export const CATALOG_SOURCES = ['LOCAL', 'COMMUNITY', 'IGDB', 'STEAM', 'RAWG'] as const;
 export type CatalogSource = (typeof CATALOG_SOURCES)[number];
 
 export const GAME_SORTS = ['popular', 'rating', 'recent', 'title'] as const;
