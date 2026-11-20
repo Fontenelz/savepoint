@@ -1,7 +1,7 @@
 import type { GoogleAuthResponse } from '@savepoint/shared';
 import { NextResponse, type NextRequest } from 'next/server';
 import { TOKEN_COOKIE, api } from '@/lib/api';
-import { GOOGLE_PATH, GOOGLE_STATE_COOKIE, googleCallbackUrl, safeNext, sessionCookie } from '@/lib/auth';
+import { GOOGLE_PATH, GOOGLE_STATE_COOKIE, googleCallbackUrl, noStore, safeNext, sessionCookie } from '@/lib/auth';
 
 /**
  * Retorno do Google. Confere o state aqui; a API troca o código pelos dados da conta
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     const res = NextResponse.redirect(new URL(path, req.url));
     res.cookies.delete({ name: GOOGLE_STATE_COOKIE, path: GOOGLE_PATH });
     if (token) res.cookies.set(TOKEN_COOKIE, token, sessionCookie);
-    return res;
+    return noStore(res);
   };
 
   if (sp.get('error')) return go('/login?error=google_cancelled');

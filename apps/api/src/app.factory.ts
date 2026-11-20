@@ -15,6 +15,17 @@ export async function createApp(): Promise<NestFastifyApplication> {
     logger: process.env.VERCEL ? ['error', 'warn', 'log'] : undefined,
   });
 
+  // Nenhuma resposta da API pode ser guardada por cache compartilhado (CDN, proxy) nem pelo
+  // navegador: várias dependem de quem está logado. Vale também para erros (401/404/500).
+  // Só /media/* (capas e banners públicos) mantém o cache próprio definido abaixo.
+  app
+    .getHttpAdapter()
+    .getInstance()
+    .addHook('onSend', async (req, reply, payload) => {
+      if (!req.url.startsWith('/media/')) reply.header('cache-control', 'private, no-store');
+      return payload;
+    });
+
   app.setGlobalPrefix('api');
   app.useGlobalFilters(new PrismaExceptionFilter());
   app.enableCors({

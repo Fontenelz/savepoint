@@ -1,12 +1,13 @@
 import { randomBytes } from 'node:crypto';
 import { NextResponse, type NextRequest } from 'next/server';
 import { TOKEN_COOKIE } from '@/lib/api';
+import { noStore } from '@/lib/auth';
 import { STEAM_PATH, STEAM_STATE_COOKIE, steamCallbackUrl } from '@/lib/steam';
 
 /** Início da conexão: manda o usuário para o login da Steam (OpenID 2.0). */
 export async function GET(req: NextRequest) {
   if (!req.cookies.get(TOKEN_COOKIE)) {
-    return NextResponse.redirect(new URL(`/login?next=${STEAM_PATH}`, req.url));
+    return noStore(NextResponse.redirect(new URL(`/login?next=${STEAM_PATH}`, req.url)));
   }
 
   const origin = req.nextUrl.origin;
@@ -30,5 +31,5 @@ export async function GET(req: NextRequest) {
     path: STEAM_PATH,
     maxAge: 10 * 60,
   });
-  return res;
+  return noStore(res);
 }

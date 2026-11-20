@@ -26,3 +26,12 @@ export const GOOGLE_ERRORS: Record<string, string> = {
   google_state: 'O login expirou ou não foi iniciado aqui. Tente de novo.',
   google_failed: 'Não foi possível entrar com o Google. Tente de novo.',
 };
+
+/**
+ * Respostas que gravam ou apagam cookies de sessão/login nunca podem ser guardadas por cache
+ * compartilhado: uma cópia guardada entregaria o cookie de uma pessoa para outra.
+ */
+export function noStore<T extends { headers: Headers }>(res: T): T {
+  res.headers.set('Cache-Control', 'private, no-store');
+  return res;
+}

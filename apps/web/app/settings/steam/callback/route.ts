@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { ApiError, api } from '@/lib/api';
+import { noStore } from '@/lib/auth';
 import { STEAM_PATH, STEAM_STATE_COOKIE, steamCallbackUrl } from '@/lib/steam';
 
 /**
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
   const done = (query: string) => {
     const res = NextResponse.redirect(new URL(`${STEAM_PATH}?${query}`, req.url));
     res.cookies.delete({ name: STEAM_STATE_COOKIE, path: STEAM_PATH });
-    return res;
+    return noStore(res);
   };
 
   if (sp.get('openid.mode') === 'cancel') return done('error=cancelled');
