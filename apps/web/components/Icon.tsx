@@ -27,6 +27,7 @@ const PATHS = {
   eye: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
   pulse: 'M3 12h4l3-8 4 16 3-8h4',
   download: 'M12 4v12M6 10l6 6 6-6M4 20h16',
+  chat: 'M4 5h16v11H9l-5 4z',
 } as const;
 
 export type IconName = keyof typeof PATHS;

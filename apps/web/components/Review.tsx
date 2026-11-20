@@ -4,6 +4,7 @@ import { shortDate } from '@/lib/format';
 import { Poster, Stars, UserLink } from './bits';
 import { Icon } from './Icon';
 import { LikeButton } from './LikeButton';
+import { ReviewThread } from './ReviewThread';
 
 /** Card de review — usado na home, na página do jogo e no perfil. */
 export function Review({
@@ -49,12 +50,14 @@ export function Review({
           ) : (
             <p className="review-body">{log.review}</p>
           ))}
-        <div className="review-foot">
+        <ReviewThread logId={log.id} initialCount={log.commentCount} canReply={canLike}>
           <LikeButton logId={log.id} initialLiked={log.viewerLiked} initialCount={log.likeCount} enabled={canLike} />
-          <span>{shortDate(log.playedOn)}</span>
-          {log.platform && <span>{log.platform}</span>}
-          {log.hours != null && <span>{Math.round(log.hours)}h</span>}
-        </div>
+          <span className="foot-meta">
+            {shortDate(log.playedOn)}
+            {log.platform && ` · ${log.platform}`}
+            {log.hours != null && ` · ${Math.round(log.hours)}h`}
+          </span>
+        </ReviewThread>
       </div>
     </article>
   );

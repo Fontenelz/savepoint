@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 interface Entry<T> {
@@ -18,7 +19,11 @@ const DAY = 24 * 60 * 60 * 1000;
  */
 @Injectable()
 export class HttpCacheService {
-  readonly root = resolve(process.env.HTTP_CACHE_DIR ?? join(process.cwd(), 'storage', 'cache', 'http'));
+  // Na Vercel só /tmp é gravável (o cache vive enquanto a instância da função viver).
+  readonly root = resolve(
+    process.env.HTTP_CACHE_DIR ??
+      (process.env.VERCEL ? join(tmpdir(), 'savepoint-http-cache') : join(process.cwd(), 'storage', 'cache', 'http')),
+  );
 
   private file(url: string) {
     return join(this.root, `${createHash('sha1').update(url).digest('hex')}.json`);

@@ -115,8 +115,8 @@ export class CatalogService {
     if (!g) throw new NotFoundException('Jogo não encontrado');
 
     const data: Prisma.GameUpdateInput = {};
-    let cover = this.media.isLocal(g.coverUrl) && !opts.force ? g.coverUrl : null;
-    let backdrop = this.media.isLocal(g.backdropUrl) && !opts.force ? g.backdropUrl : null;
+    let cover = this.media.isStored(g.coverUrl) && !opts.force ? g.coverUrl : null;
+    let backdrop = this.media.isStored(g.backdropUrl) && !opts.force ? g.backdropUrl : null;
     let source: string | null = null;
     let matched: string | null = null;
 
@@ -124,12 +124,15 @@ export class CatalogService {
     if (!opts.force) {
       cover ??= await this.media.existing('covers', g.slug);
       backdrop ??= await this.media.existing('backdrops', g.slug);
+      // Produção (Blob): reaproveita as imagens já baixadas no disco local, sem consultar fontes externas.
+      cover ??= await this.media.uploadFromDisk('covers', g.slug);
+      backdrop ??= await this.media.uploadFromDisk('backdrops', g.slug);
       if (cover && cover !== g.coverUrl) data.coverUrl = cover;
       if (backdrop && backdrop !== g.backdropUrl) data.backdropUrl = backdrop;
     }
 
-    // 2) URL remota informada pelo usuário/importação: traz para o armazenamento local.
-    if (!cover && g.coverUrl && !this.media.isLocal(g.coverUrl)) {
+    // 2) URL remota informada pelo usuário/importação: traz para o nosso armazenamento.
+    if (!cover && g.coverUrl && /^https?:\/\//.test(g.coverUrl) && !this.media.isStored(g.coverUrl)) {
       const saved = await this.media.download('covers', g.slug, [g.coverUrl], opts);
       if (saved) data.coverUrl = cover = saved.path;
     }
@@ -175,8 +178,12 @@ export class CatalogService {
         : {
             OR: [
               { coverUrl: null },
-              { NOT: { coverUrl: { startsWith: '/media/' } } },
               { backdropUrl: null },
+              // local: falta baixar o que não está em /media; blob: falta enviar o que ainda é /media ou externo
+              this.media.driver === 'local'
+                ? { NOT: { coverUrl: { startsWith: '/media/' } } }
+                : { NOT: { coverUrl: { contains: '.blob.vercel-storage.com' } } },
+              ...(this.media.driver === 'blob' ? [{ NOT: { backdropUrl: { contains: '.blob.vercel-storage.com' } } }] : []),
             ],
           },
       orderBy: { title: 'asc' },

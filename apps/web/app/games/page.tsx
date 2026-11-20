@@ -1,8 +1,10 @@
-import type { CatalogMeta, GameSummary, Paginated } from '@savepoint/shared';
+import type { CatalogMeta, GameSummary, Paginated, ViewerGameMark } from '@savepoint/shared';
 import { formatAvg } from '@savepoint/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Empty, Pagination, Poster } from '@/components/bits';
+import { Empty, Pagination, Poster, Stars } from '@/components/bits';
+import { Icon } from '@/components/Icon';
+import { getViewer } from '@/lib/session';
 import { api } from '@/lib/api';
 
 export const metadata: Metadata = { title: 'Jogos' };
@@ -18,6 +20,12 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
     api<CatalogMeta>('/meta'),
     api<Paginated<GameSummary>>(`/games?${params}`),
   ]);
+  // Marcas do usuário logado (status, nota, like, listas) para os jogos desta página
+  const viewer = await getViewer();
+  const marks: Record<string, ViewerGameMark> =
+    viewer && data.items.length
+      ? await api<Record<string, ViewerGameMark>>(`/library/marks?ids=${data.items.map((g) => g.id).join(',')}`).catch(() => ({}))
+      : {};
 
   const hrefFor = (page: number) => {
     const p = new URLSearchParams(params);
@@ -76,16 +84,34 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
           </p>
         </Empty>
       ) : (
-        <div className="grid-posters">
-          {data.items.map((g) => (
-            <Poster key={g.id} game={g}>
-              <span className="stars" style={{ fontSize: 11 }}>
-                {g.ratingAvg ? `★ ${formatAvg(g.ratingAvg)}` : ''}
-              </span>
-              <span>{g.releaseYear}</span>
-            </Poster>
-          ))}
-        </div>
+        <>
+          {viewer && (
+            <p className="mark-legend">
+              Nas capas: <Icon name="play" size={11} /> seu status · <Icon name="list" size={11} /> está em uma lista sua ·{' '}
+              <span className="stars">★</span> sua nota
+            </p>
+          )}
+          <div className="grid-posters">
+            {data.items.map((g) => {
+              const m = marks[g.id];
+              return (
+                <Poster key={g.id} game={g} status={m?.status} inList={m?.inList}>
+                  {m?.rating ? (
+                    <Stars rating={m.rating} className="mine" />
+                  ) : (
+                    <span className="stars community" title="Média da comunidade">
+                      {g.ratingAvg ? `★ ${formatAvg(g.ratingAvg)}` : ''}
+                    </span>
+                  )}
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {m?.liked && <Icon name="heart" size={11} fill className="heart" />}
+                    {g.releaseYear}
+                  </span>
+                </Poster>
+              );
+            })}
+          </div>
+        </>
       )}
       <Pagination page={data.page} totalPages={data.totalPages} hrefFor={hrefFor} />
     </div>

@@ -69,6 +69,24 @@ export interface LogView {
   game: GameSummary;
   likeCount: number;
   viewerLiked: boolean;
+  commentCount: number;
+}
+
+export interface ReviewComment {
+  id: string;
+  body: string;
+  createdAt: string;
+  user: UserSummary;
+  /** O usuário logado pode apagar (autor da resposta ou dono da review). */
+  canDelete: boolean;
+}
+
+/** Estado de um jogo para o usuário logado, usado para marcar capas em listagens. */
+export interface ViewerGameMark {
+  status: PlayStatus | null;
+  rating: number | null;
+  liked: boolean;
+  inList: boolean;
 }
 
 export interface ListSummary {

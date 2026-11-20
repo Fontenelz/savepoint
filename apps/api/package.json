@@ -25,6 +25,7 @@
     "@nestjs/platform-fastify": "^11.1.6",
     "@prisma/client": "^6.16.2",
     "@savepoint/shared": "workspace:*",
+    "@vercel/blob": "^2.9.0",
     "bcryptjs": "^3.0.2",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",

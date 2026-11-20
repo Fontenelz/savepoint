@@ -2,6 +2,11 @@ import { z } from 'zod';
 import { GAME_SORTS, LIBRARY_FILTERS, PLAY_STATUSES } from './enums';
 
 const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use o formato AAAA-MM-DD');
+/** Data que não pode estar no futuro (1 dia de folga por causa de fusos horários). */
+const pastDate = dateString.refine((d) => {
+  const limit = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return d <= limit;
+}, 'A data não pode estar no futuro');
 /** Nota interna de 1 a 10 (= 0,5 a 5 estrelas). */
 const rating = z.number().int().min(1).max(10);
 
@@ -29,14 +34,14 @@ export const libraryEntrySchema = z.object({
   liked: z.boolean().optional(),
   platformId: z.string().nullable().optional(),
   hoursPlayed: z.number().min(0).max(100000).nullable().optional(),
-  startedAt: dateString.nullable().optional(),
-  finishedAt: dateString.nullable().optional(),
+  startedAt: pastDate.nullable().optional(),
+  finishedAt: pastDate.nullable().optional(),
 });
 export type LibraryEntryInput = z.infer<typeof libraryEntrySchema>;
 
 export const logEntrySchema = z.object({
   gameId: z.string().min(1),
-  playedOn: dateString,
+  playedOn: pastDate,
   platformId: z.string().nullable().optional(),
   hours: z.number().min(0).max(100000).nullable().optional(),
   finished: z.boolean().default(false),
@@ -99,3 +104,15 @@ export const updateProfileSchema = z.object({
   bio: z.string().trim().max(300).nullable().optional(),
 });
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+export const commentSchema = z.object({
+  body: z.string().trim().min(1, 'Escreva alguma coisa').max(2000),
+});
+export type CommentInput = z.infer<typeof commentSchema>;
+
+export const gameIdsQuerySchema = z.object({
+  ids: z
+    .string()
+    .transform((v) => v.split(',').map((x) => x.trim()).filter(Boolean))
+    .pipe(z.array(z.string()).max(100)),
+});

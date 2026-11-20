@@ -53,7 +53,7 @@ export function logSelect(viewerId?: string) {
     platform: { select: { short: true } },
     user: { select: userSummarySelect },
     game: { select: gameSummarySelect },
-    _count: { select: { likes: true } },
+    _count: { select: { likes: true, comments: true } },
     likes: { where: { userId: viewerId ?? '__anon__' }, select: { userId: true }, take: 1 },
   } satisfies Prisma.LogEntrySelect;
 }
@@ -76,6 +76,7 @@ export function toLogView(l: LogRow): LogView {
     user: l.user,
     game: toGameSummary(l.game),
     likeCount: l._count.likes,
+    commentCount: l._count.comments,
     viewerLiked: l.likes.length > 0,
   };
 }

@@ -3084,3 +3084,153 @@ a.chip:hover {
     -webkit-text-stroke-width: 3px;
   }
 }
+
+/* Marcas do usuário nas capas do catálogo */
+.list-pip {
+  position: absolute;
+  /* abaixo do selo de status, para não cobrir o rótulo das capas geradas */
+  top: 30px;
+  right: 5px;
+  z-index: 2;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 0.75);
+  color: var(--info);
+  box-shadow: 0 0 0 1.5px var(--info);
+}
+
+.poster:not(:has(.status-pip)) > .list-pip {
+  top: 5px;
+}
+
+.poster-meta .stars.community {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.poster-meta .stars.mine {
+  font-size: 11px;
+}
+
+.mark-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: -8px 0 16px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Rodapé da review: curtir e responder como ícones maiores */
+.review-foot .like-btn,
+.reply-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: none;
+  padding: 4px 6px;
+  margin-left: -6px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.review-foot .like-btn:hover,
+.reply-btn:hover {
+  background: var(--surface);
+}
+
+.reply-btn:hover,
+.reply-btn.on {
+  color: var(--info);
+}
+
+.like-count,
+.reply-btn span {
+  font-variant-numeric: tabular-nums;
+}
+
+.foot-meta {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+/* Conversa da review */
+.thread {
+  margin-top: 10px;
+  padding: 12px 0 0 14px;
+  border-left: 2px solid var(--line-2);
+  display: grid;
+  gap: 12px;
+}
+
+.thread-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.thread-item {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.thread-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.thread-meta a {
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.thread-meta a:hover {
+  color: var(--accent);
+}
+
+.thread-delete {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  padding: 2px;
+  color: var(--faint);
+}
+
+.thread-delete:hover {
+  color: var(--heart);
+}
+
+.thread-body {
+  margin-top: 2px;
+  font-size: 14px;
+  color: var(--text-2);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.thread-empty {
+  font-size: 13px;
+}
+
+.thread-form {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+
+.thread-form .textarea {
+  min-height: 64px;
+}

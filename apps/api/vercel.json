@@ -1,0 +1,14 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
+  "buildCommand": "cd ../.. && pnpm turbo run build --filter=@savepoint/api && cd apps/api && pnpm exec prisma migrate deploy",
+  "outputDirectory": "public",
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 30,
+      "includeFiles": "{dist/**,prisma/schema.prisma}"
+    }
+  },
+  "rewrites": [{ "source": "/(.*)", "destination": "/api" }]
+}

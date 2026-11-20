@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { logEntrySchema, type LogView, type PlayStatus } from '@savepoint/shared';
+import { logEntrySchema, type LogView, type PlayStatus, type ReviewComment } from '@savepoint/shared';
 import type { z } from 'zod';
-import { fromDateString, logSelect, toLogView } from '../core/mappers';
+import { fromDateString, logSelect, toLogView, userSummarySelect } from '../core/mappers';
 import { PrismaService } from '../core/prisma.service';
 import { StatsService } from '../core/stats.service';
 
@@ -98,5 +98,47 @@ export class LogsService {
 
     const likeCount = await this.prisma.reviewLike.count({ where: { logId } });
     return { liked: !existing, likeCount };
+  }
+
+  // ─── Respostas (comentários) ───────────────────────────────────────────
+
+  async comments(logId: string, viewerId?: string): Promise<ReviewComment[]> {
+    const log = await this.prisma.logEntry.findUnique({ where: { id: logId }, select: { userId: true } });
+    if (!log) throw new NotFoundException('Review não encontrada');
+    const rows = await this.prisma.reviewComment.findMany({
+      where: { logId },
+      orderBy: { createdAt: 'asc' },
+      take: 200,
+      select: { id: true, body: true, createdAt: true, userId: true, user: { select: userSummarySelect } },
+    });
+    return rows.map((c) => ({
+      id: c.id,
+      body: c.body,
+      createdAt: c.createdAt.toISOString(),
+      user: c.user,
+      canDelete: Boolean(viewerId) && (c.userId === viewerId || log.userId === viewerId),
+    }));
+  }
+
+  async addComment(userId: string, logId: string, body: string): Promise<ReviewComment> {
+    const log = await this.prisma.logEntry.findUnique({ where: { id: logId }, select: { review: true } });
+    if (!log) throw new NotFoundException('Review não encontrada');
+    if (!log.review) throw new ForbiddenException('Só é possível responder registros com review');
+    const c = await this.prisma.reviewComment.create({
+      data: { logId, userId, body },
+      select: { id: true, body: true, createdAt: true, user: { select: userSummarySelect } },
+    });
+    return { ...c, createdAt: c.createdAt.toISOString(), canDelete: true };
+  }
+
+  /** Autor da resposta ou dono da review podem apagar. */
+  async removeComment(userId: string, commentId: string) {
+    const c = await this.prisma.reviewComment.findUnique({
+      where: { id: commentId },
+      select: { userId: true, log: { select: { userId: true } } },
+    });
+    if (!c) throw new NotFoundException('Resposta não encontrada');
+    if (c.userId !== userId && c.log.userId !== userId) throw new ForbiddenException();
+    await this.prisma.reviewComment.delete({ where: { id: commentId } });
   }
 }

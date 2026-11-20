@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { MAX_FAVORITES, type LibraryEntryInput, type UserGameState } from '@savepoint/shared';
+import { MAX_FAVORITES, type LibraryEntryInput, type UserGameState, type ViewerGameMark } from '@savepoint/shared';
 import { fromDateString, toUserGameState, userGameStateSelect } from '../core/mappers';
 import { PrismaService } from '../core/prisma.service';
 import { StatsService } from '../core/stats.service';
@@ -93,6 +93,27 @@ export class LibraryService {
       select: userGameStateSelect,
     });
     return toUserGameState(entry);
+  }
+
+  /** Marcas do usuário (status, nota, like, se está em alguma lista) para vários jogos de uma vez. */
+  async marks(userId: string, gameIds: string[]): Promise<Record<string, ViewerGameMark>> {
+    if (!gameIds.length) return {};
+    const [entries, listed] = await Promise.all([
+      this.prisma.userGame.findMany({
+        where: { userId, gameId: { in: gameIds } },
+        select: { gameId: true, status: true, rating: true, liked: true },
+      }),
+      this.prisma.listItem.findMany({
+        where: { gameId: { in: gameIds }, list: { userId } },
+        select: { gameId: true },
+        distinct: ['gameId'],
+      }),
+    ]);
+    const inList = new Set(listed.map((l) => l.gameId));
+    const out: Record<string, ViewerGameMark> = {};
+    for (const e of entries) out[e.gameId] = { status: e.status, rating: e.rating, liked: e.liked, inList: inList.has(e.gameId) };
+    for (const id of inList) out[id] ??= { status: null, rating: null, liked: false, inList: true };
+    return out;
   }
 
   private async ensureGame(gameId: string) {

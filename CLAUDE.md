@@ -62,15 +62,22 @@ Env: `apps/api/.env` (DATABASE_URL, JWT_SECRET, IGDB opcional) e `apps/web/.env.
 - Não rodar `next build` com o `pnpm dev` ativo (os dois usam `.next`).
 - Commits com mensagem em português/inglês convencional (`feat:`, `fix:`).
 
+## Produção
+
+- API roda como servidor (`src/main.ts`) **ou** como função serverless (`src/serverless.ts` ← `api/index.js`), ambos via `src/app.factory.ts`.
+- Imagens: `MediaService` usa disco local ou **Vercel Blob** (quando há `BLOB_READ_WRITE_TOKEN`). O sync envia para o Blob as imagens já baixadas em `storage/media`.
+- Erros conhecidos do Prisma viram 400/404/409 (`PrismaExceptionFilter`). Datas no futuro são rejeitadas.
+- Respostas em reviews (`ReviewComment`) e marcas do usuário no catálogo (`GET /library/marks`).
+
 ## O que falta / próximos passos
 
 - [ ] Conferir visualmente o último ajuste do Top 10 (alinhamento do "1" com a margem — `.slider--rank` com `--rank-shift`).
 - [ ] Testes: nenhum ainda (Jest/Vitest na API, Playwright no web) + CI.
-- [ ] Rate limit no login (`@nestjs/throttler`).
+- [x] Limite de tentativas de login (8 erros/15 min por conta, guardado no banco — `LoginThrottle`).
 - [ ] Upload de foto de perfil (hoje todos usam a silhueta).
 - [ ] Imagens faltando: *Final Fantasy VII Remake* e *Horizon Chase Turbo* (download bloqueado/limitado na rede da empresa — rodar `pnpm catalog:sync` fora dela); *Minecraft* não tem capa na Wikipedia. Exclusivos de console não têm banner (vem da Steam).
 - [ ] Importar biblioteca e horas da Steam (o `steamAppId` já é salvo nos jogos).
 - [ ] "O que jogo agora?" — sugestão do backlog pelo tempo disponível.
 - [ ] Retrospectiva anual compartilhável; comentários em reviews; notificações.
-- [ ] Publicar: repositório sem remoto configurado; deploy ainda não definido.
+- [ ] **Deploy na Vercel** (código pronto, ver `DEPLOY.md`): site e API como dois projetos, Prisma Postgres + Vercel Blob. Falta: repositório no GitHub, criar os projetos e validar o 1º deploy real (inclusão do binário do Prisma, pnpm 12 via corepack).
 - [ ] Acesso pelo celular físico: exige `portproxy` + regra de firewall no Windows (WSL2) — ver histórico/README; rede da empresa pode bloquear.

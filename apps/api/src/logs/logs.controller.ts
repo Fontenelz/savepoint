@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
-import { logEntrySchema } from '@savepoint/shared';
+import { commentSchema, logEntrySchema, type CommentInput } from '@savepoint/shared';
 import type { z } from 'zod';
 import { Auth, CurrentUser, OptionalAuth, type AuthUser } from '../auth/auth.guard';
 import { ZodPipe } from '../core/zod.pipe';
@@ -31,5 +31,23 @@ export class LogsController {
   @Auth()
   like(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.logs.toggleLike(user.id, id);
+  }
+
+  @Get(':id/comments')
+  @OptionalAuth()
+  comments(@Param('id') id: string, @CurrentUser() user?: AuthUser) {
+    return this.logs.comments(id, user?.id);
+  }
+
+  @Post(':id/comments')
+  @Auth()
+  addComment(@Param('id') id: string, @Body(new ZodPipe(commentSchema)) body: CommentInput, @CurrentUser() user: AuthUser) {
+    return this.logs.addComment(user.id, id, body.body);
+  }
+
+  @Delete('comments/:commentId')
+  @Auth()
+  removeComment(@Param('commentId') commentId: string, @CurrentUser() user: AuthUser) {
+    return this.logs.removeComment(user.id, commentId);
   }
 }

@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, Param, Post, Put } from '@nestjs/common';
-import { libraryEntrySchema, type LibraryEntryInput } from '@savepoint/shared';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query } from '@nestjs/common';
+import { gameIdsQuerySchema, libraryEntrySchema, type LibraryEntryInput } from '@savepoint/shared';
 import { Auth, CurrentUser, type AuthUser } from '../auth/auth.guard';
 import { ZodPipe } from '../core/zod.pipe';
 import { LibraryService } from './library.service';
@@ -8,6 +8,12 @@ import { LibraryService } from './library.service';
 @Auth()
 export class LibraryController {
   constructor(private readonly library: LibraryService) {}
+
+  /** GET /library/marks?ids=a,b,c */
+  @Get('marks')
+  marks(@Query(new ZodPipe(gameIdsQuerySchema)) query: { ids: string[] }, @CurrentUser() user: AuthUser) {
+    return this.library.marks(user.id, query.ids);
+  }
 
   @Put(':gameId')
   upsert(

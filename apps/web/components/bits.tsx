@@ -50,11 +50,14 @@ export function UserLink({ user, size = 22 }: { user: UserSummary; size?: number
 export function Poster({
   game,
   status,
+  inList,
   children,
   tip = true,
 }: {
   game: GameSummary;
   status?: PlayStatus | null;
+  /** Mostra o selo "está em uma lista sua". */
+  inList?: boolean;
   children?: ReactNode;
   tip?: boolean;
 }) {
@@ -70,6 +73,11 @@ export function Poster({
         {status && (
           <span className="status-pip" style={{ '--pip': STATUS_COLOR[status] } as CSSProperties} title={PLAY_STATUS_LABEL[status]}>
             <Icon name={STATUS_ICON[status]} size={11} />
+          </span>
+        )}
+        {inList && (
+          <span className="list-pip" title="Está em uma lista sua">
+            <Icon name="list" size={11} />
           </span>
         )}
         <GameCover game={game} />

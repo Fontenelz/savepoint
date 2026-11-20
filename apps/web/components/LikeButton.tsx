@@ -19,10 +19,11 @@ export function LikeButton({
   const [pending, start] = useTransition();
 
   const label = `${state.count} ${state.count === 1 ? 'curtida' : 'curtidas'}`;
+  const count = <span className="like-count">{state.count}</span>;
   if (!enabled) {
     return (
-      <span className="like-btn">
-        <Icon name="heart" size={13} /> {label}
+      <span className="like-btn" title={label} aria-label={label}>
+        <Icon name="heart" size={17} /> {count}
       </span>
     );
   }
@@ -33,6 +34,8 @@ export function LikeButton({
       className={`like-btn ${state.liked ? 'on' : ''}`}
       disabled={pending}
       aria-pressed={state.liked}
+      aria-label={`${state.liked ? 'Descurtir' : 'Curtir'} review (${label})`}
+      title={label}
       onClick={() => {
         const prev = state;
         // Atualização otimista: a UI responde na hora, o servidor confirma depois.
@@ -44,7 +47,7 @@ export function LikeButton({
         });
       }}
     >
-      <Icon name="heart" size={13} fill={state.liked} /> {state.liked ? 'Curtiu' : 'Curtir'} · {label}
+      <Icon name="heart" size={17} fill={state.liked} /> {count}
     </button>
   );
 }

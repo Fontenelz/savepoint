@@ -9,6 +9,7 @@ import {
   type GameSummary,
   type LibraryEntryInput,
   type ListInput,
+  type ReviewComment,
   type LogEntryInput,
   type UserGameState,
 } from '@savepoint/shared';
@@ -102,6 +103,18 @@ export async function deleteLogAction(id: string, path: string) {
 
 export async function toggleReviewLikeAction(logId: string) {
   return run(() => api<{ liked: boolean; likeCount: number }>(`/logs/${logId}/like`, { method: 'POST' }));
+}
+
+export async function getCommentsAction(logId: string) {
+  return run(() => api<ReviewComment[]>(`/logs/${logId}/comments`));
+}
+
+export async function addCommentAction(logId: string, body: string) {
+  return run(() => api<ReviewComment>(`/logs/${logId}/comments`, { method: 'POST', json: { body } }));
+}
+
+export async function deleteCommentAction(commentId: string) {
+  return run(() => api(`/logs/comments/${commentId}`, { method: 'DELETE' }));
 }
 
 // ─── Social ──────────────────────────────────────────────────────────────────

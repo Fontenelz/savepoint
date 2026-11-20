@@ -1,8 +1,19 @@
-import { ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { AuthResponse, LoginInput, RegisterInput, Viewer } from '@savepoint/shared';
 import { compare, hash } from 'bcryptjs';
 import { PrismaService } from '../core/prisma.service';
+
+/** Proteção contra força bruta: 8 senhas erradas por conta a cada 15 minutos. */
+const MAX_FAILURES = 8;
+const WINDOW_MS = 15 * 60 * 1000;
 
 const viewerSelect = { id: true, username: true, displayName: true, avatarHue: true, email: true };
 
@@ -38,13 +49,18 @@ export class AuthService {
   }
 
   async login(input: LoginInput): Promise<AuthResponse> {
+    const key = `login:${input.login}`;
+    await this.assertNotThrottled(key);
+
     const user = await this.prisma.user.findFirst({
       where: { OR: [{ username: input.login }, { email: input.login }] },
       select: { ...viewerSelect, passwordHash: true },
     });
     if (!user || !(await compare(input.password, user.passwordHash))) {
+      await this.registerFailure(key);
       throw new UnauthorizedException('Usuário ou senha incorretos');
     }
+    await this.prisma.loginThrottle.deleteMany({ where: { key } });
     const { passwordHash: _, ...viewer } = user;
     return this.issue(viewer);
   }
@@ -53,6 +69,29 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { id: userId }, select: viewerSelect });
     if (!user) throw new NotFoundException('Usuário não encontrado');
     return user;
+  }
+
+  private async assertNotThrottled(key: string) {
+    const t = await this.prisma.loginThrottle.findUnique({ where: { key } });
+    if (!t || t.failures < MAX_FAILURES) return;
+    const remaining = t.windowStart.getTime() + WINDOW_MS - Date.now();
+    if (remaining <= 0) return; // janela venceu: registerFailure reinicia a contagem
+    const minutes = Math.ceil(remaining / 60000);
+    throw new HttpException(
+      `Muitas tentativas de login. Tente de novo em ${minutes} minuto${minutes > 1 ? 's' : ''}.`,
+      HttpStatus.TOO_MANY_REQUESTS,
+    );
+  }
+
+  private async registerFailure(key: string) {
+    const now = new Date();
+    const t = await this.prisma.loginThrottle.findUnique({ where: { key } });
+    const expired = !t || now.getTime() - t.windowStart.getTime() > WINDOW_MS;
+    await this.prisma.loginThrottle.upsert({
+      where: { key },
+      create: { key, failures: 1, windowStart: now },
+      update: expired ? { failures: 1, windowStart: now } : { failures: { increment: 1 } },
+    });
   }
 
   private async issue(user: Viewer): Promise<AuthResponse> {

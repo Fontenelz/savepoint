@@ -1,5 +1,7 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // "native" para desenvolvimento; rhel-openssl-3.0.x para as funções da Vercel
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
@@ -39,6 +41,7 @@ model User {
   logs         LogEntry[]
   lists        GameList[]
   reviewLikes  ReviewLike[]
+  comments     ReviewComment[]
   following    Follow[]   @relation("follower")
   followers    Follow[]   @relation("following")
   gamesCreated Game[]     @relation("createdBy")
@@ -150,6 +153,7 @@ model LogEntry {
   game     Game         @relation(fields: [gameId], references: [id], onDelete: Cascade)
   platform Platform?    @relation(fields: [platformId], references: [id], onDelete: SetNull)
   likes    ReviewLike[]
+  comments ReviewComment[]
 
   @@index([userId, playedOn])
   @@index([gameId, createdAt])
@@ -163,6 +167,19 @@ model ReviewLike {
   log       LogEntry @relation(fields: [logId], references: [id], onDelete: Cascade)
 
   @@id([userId, logId])
+}
+
+/// Resposta a uma review (entrada do diário com texto).
+model ReviewComment {
+  id        String   @id @default(cuid())
+  logId     String
+  userId    String
+  body      String
+  createdAt DateTime @default(now())
+  log       LogEntry @relation(fields: [logId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([logId, createdAt])
 }
 
 model Follow {
@@ -198,4 +215,12 @@ model ListItem {
 
   @@unique([listId, gameId])
   @@index([listId, position])
+}
+
+/// Tentativas de login com senha errada por conta (proteção contra força bruta).
+/// Fica no banco porque, em funções serverless, cada instância tem sua própria memória.
+model LoginThrottle {
+  key         String   @id
+  failures    Int      @default(0)
+  windowStart DateTime @default(now())
 }
