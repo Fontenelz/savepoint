@@ -30,6 +30,13 @@ import {
 } from '../core/mappers';
 import { PrismaService } from '../core/prisma.service';
 
+/** Tem horas jogadas (ex.: importado da Steam sem status). */
+const HAS_HOURS = { hoursPlayed: { gt: 0 } } satisfies Prisma.UserGameWhereInput;
+/** Jogado = status de jogado, ou sem status mas com horas. */
+const PLAYED_WHERE = {
+  OR: [{ status: { in: PLAYED_STATUSES } }, { status: null, ...HAS_HOURS }],
+} satisfies Prisma.UserGameWhereInput;
+
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
@@ -92,7 +99,7 @@ export class UsersService {
           select: { game: { select: gameSummarySelect } },
         }),
         this.prisma.userGame.findMany({
-          where: { userId: user.id, status: { in: PLAYED_STATUSES } },
+          where: { userId: user.id, ...PLAYED_WHERE },
           select: {
             game: { select: { genres: { select: { name: true } } } },
             platform: { select: { name: true } },
@@ -126,7 +133,8 @@ export class UsersService {
       isMe: viewerId === user.id,
       viewerFollows: Boolean(follows),
       counts: {
-        played: PLAYED_STATUSES.reduce((n, s) => n + statusCounts[s], 0),
+        // Jogos importados só com horas (sem status) também contam como jogados.
+        played: played.length,
         completed: FINISHED_STATUSES.reduce((n, s) => n + statusCounts[s], 0),
         backlog: statusCounts.BACKLOG,
         thisYear: thisYear.length,
@@ -152,9 +160,9 @@ export class UsersService {
     const pageSize = 48;
     const filter: Prisma.UserGameWhereInput =
       query.filter === 'all'
-        ? { OR: [{ status: { not: null } }, { rating: { not: null } }, { liked: true }] }
+        ? { OR: [{ status: { not: null } }, { rating: { not: null } }, { liked: true }, HAS_HOURS] }
         : query.filter === 'played'
-          ? { status: { in: PLAYED_STATUSES } }
+          ? PLAYED_WHERE
           : query.filter === 'liked'
             ? { liked: true }
             : query.filter === 'rated'

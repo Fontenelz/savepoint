@@ -13,7 +13,8 @@
     "db:reset": "prisma migrate reset --force --skip-seed && pnpm db:seed",
     "catalog:sync": "nest build && node dist/catalog/sync.cli.js",
     "catalog:import": "nest build && node dist/catalog/import.cli.js",
-    "catalog:enrich": "nest build && node dist/catalog/enrich.cli.js"
+    "catalog:enrich": "nest build && node dist/catalog/enrich.cli.js",
+    "stats:refresh": "nest build && node dist/core/stats.cli.js"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

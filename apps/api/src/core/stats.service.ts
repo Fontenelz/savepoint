@@ -16,7 +16,8 @@ export class StatsService {
         _avg: { rating: true },
         _count: { rating: true },
       }),
-      this.prisma.userGame.count({ where: { gameId, status: { not: null } } }),
+      // Jogador = tem status ou horas jogadas (importação da Steam traz só as horas).
+      this.prisma.userGame.count({ where: { gameId, OR: [{ status: { not: null } }, { hoursPlayed: { gt: 0 } }] } }),
       this.prisma.userGame.count({ where: { gameId, liked: true } }),
     ]);
 
