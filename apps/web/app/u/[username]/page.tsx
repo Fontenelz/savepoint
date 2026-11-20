@@ -10,13 +10,24 @@ import { QueueSection } from '@/components/QueueCarousel';
 import { Slider } from '@/components/Slider';
 import { getProfile } from '@/lib/profile';
 import { getViewer } from '@/lib/session';
+import { metaDescription, publicPageMeta } from '@/lib/site';
 
 type Props = { params: Promise<{ username: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
   const p = await getProfile(username);
-  return { title: `${p.user.displayName} (@${p.user.username})` };
+  const c = p.counts;
+  const resumo = `${c.played} ${c.played === 1 ? 'jogo jogado' : 'jogos jogados'}, ${c.completed} ${c.completed === 1 ? 'zerado' : 'zerados'} e ${c.hours.toLocaleString('pt-BR')} h de jogo`;
+  return publicPageMeta({
+    title: `${p.user.displayName} (@${p.user.username})`,
+    description: metaDescription(
+      p.user.bio ? `${p.user.bio} · ${resumo} no Savepoint.` : `Diário de jogos de ${p.user.displayName} no Savepoint: ${resumo}.`,
+    ),
+    path: `/u/${p.user.username}`,
+    type: 'profile',
+    ownImage: true,
+  });
 }
 
 export default async function ProfilePage({ params }: Props) {

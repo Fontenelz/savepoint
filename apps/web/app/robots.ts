@@ -1,0 +1,15 @@
+import type { MetadataRoute } from 'next';
+import { SITE_URL } from '@/lib/site';
+
+/** Páginas públicas liberadas; páginas pessoais e rotas de login fora da busca. */
+export default function robots(): MetadataRoute.Robots {
+  return {
+    rules: {
+      userAgent: '*',
+      allow: '/',
+      disallow: ['/settings', '/activity', '/auth/', '/login', '/register', '/games/new', '/lists/new', '/lists/*/edit'],
+    },
+    sitemap: `${SITE_URL}/sitemap.xml`,
+    host: SITE_URL,
+  };
+}

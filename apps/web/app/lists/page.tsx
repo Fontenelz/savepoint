@@ -1,11 +1,16 @@
 import type { ListSummary, Paginated } from '@savepoint/shared';
 import type { Metadata } from 'next';
+import { publicPageMeta } from '@/lib/site';
 import Link from 'next/link';
 import { Empty, ListCard, Pagination } from '@/components/bits';
 import { api } from '@/lib/api';
 import { getViewer } from '@/lib/session';
 
-export const metadata: Metadata = { title: 'Listas' };
+export const metadata: Metadata = publicPageMeta({
+  title: 'Listas',
+  description: 'Listas de jogos montadas pela comunidade do Savepoint: favoritos, rankings, recomendações e muito mais.',
+  path: '/lists',
+});
 
 export default async function ListsPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const { page = '1' } = await searchParams;

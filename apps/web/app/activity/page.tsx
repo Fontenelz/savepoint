@@ -10,7 +10,8 @@ import { api } from '@/lib/api';
 import { relativeTime, shortDate } from '@/lib/format';
 import { getViewer } from '@/lib/session';
 
-export const metadata: Metadata = { title: 'Atividade' };
+// Página pessoal: fora da busca.
+export const metadata: Metadata = { title: 'Atividade', robots: { index: false, follow: false } };
 
 function verb(log: LogView) {
   if (log.replay) return 'rejogou';

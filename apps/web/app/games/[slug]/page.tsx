@@ -9,17 +9,56 @@ import { Review } from '@/components/Review';
 import { Slider } from '@/components/Slider';
 import { api, apiOrNotFound } from '@/lib/api';
 import { getViewer } from '@/lib/session';
+import { SITE_URL, metaDescription, publicPageMeta } from '@/lib/site';
 
 type Props = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   try {
+    // Mesma requisição da página (o Next reaproveita a resposta); só campos públicos são usados.
     const g = await api<GameDetail>(`/games/${slug}`);
-    return { title: `${g.title}${g.releaseYear ? ` (${g.releaseYear})` : ''}`, description: g.summary ?? undefined };
+    return publicPageMeta({
+      title: `${g.title}${g.releaseYear ? ` (${g.releaseYear})` : ''}`,
+      description: metaDescription(g.summary, `${g.title} no Savepoint: notas da comunidade, reviews e quem está jogando.`),
+      path: `/games/${g.slug}`,
+      ownImage: true,
+    });
   } catch {
     return { title: 'Jogo' };
   }
+}
+
+/**
+ * Dados estruturados (schema.org/VideoGame) para o Google. Nota de 1–10 vira escala de 5 estrelas,
+ * como no site. `<` é escapado: a sinopse pode ter sido escrita por um usuário.
+ */
+function gameJsonLd(game: GameDetail) {
+  const data = {
+    '@context': 'https://schema.org',
+    '@type': 'VideoGame',
+    name: game.title,
+    url: `${SITE_URL}/games/${game.slug}`,
+    ...(game.summary ? { description: metaDescription(game.summary, '') } : {}),
+    ...(game.coverUrl ? { image: game.coverUrl.startsWith('/') ? `${SITE_URL}${game.coverUrl}` : game.coverUrl } : {}),
+    ...(game.releaseYear ? { datePublished: String(game.releaseYear) } : {}),
+    ...(game.developer ? { author: { '@type': 'Organization', name: game.developer } } : {}),
+    ...(game.publisher ? { publisher: { '@type': 'Organization', name: game.publisher } } : {}),
+    ...(game.genres.length ? { genre: game.genres.map((g) => g.name) } : {}),
+    ...(game.platformList.length ? { gamePlatform: game.platformList.map((p) => p.name) } : {}),
+    ...(game.stats.ratingAvg != null && game.stats.ratingCount > 0
+      ? {
+          aggregateRating: {
+            '@type': 'AggregateRating',
+            ratingValue: Math.round((game.stats.ratingAvg / 2) * 10) / 10,
+            bestRating: 5,
+            worstRating: 0.5,
+            ratingCount: game.stats.ratingCount,
+          },
+        }
+      : {}),
+  };
+  return JSON.stringify(data).replace(/</g, '\\u003c');
 }
 
 const SOURCE_LABEL: Record<CatalogSource, string> = {
@@ -40,6 +79,7 @@ export default async function GamePage({ params }: Props) {
 
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: gameJsonLd(game) }} />
       <div className={`backdrop ${game.backdropUrl ? 'has-art' : ''}`} aria-hidden>
         {game.backdropUrl ? (
           // eslint-disable-next-line @next/next/no-img-element

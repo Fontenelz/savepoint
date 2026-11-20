@@ -8,7 +8,8 @@ import { api, errorMessage } from '@/lib/api';
 import { getViewer } from '@/lib/session';
 import { STEAM_ERRORS, STEAM_PATH } from '@/lib/steam';
 
-export const metadata: Metadata = { title: 'Steam' };
+// Página pessoal: fora da busca.
+export const metadata: Metadata = { title: 'Steam', robots: { index: false, follow: false } };
 
 type Props = { searchParams: Promise<{ linked?: string; error?: string }> };
 
