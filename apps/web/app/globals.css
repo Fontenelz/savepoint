@@ -2097,6 +2097,35 @@ a.chip:hover {
   color: var(--accent);
 }
 
+/* Botão claro, como pede a identidade do Google para "Continuar com Google" */
+.btn-google {
+  gap: 10px;
+  background: #fff;
+  color: #1f1f1f;
+  border-color: #dadce0;
+}
+
+.btn-google:hover {
+  background: #f1f3f4;
+  color: #1f1f1f;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
 /* ==========================================================================
    Formulários de página (novo jogo, lista)
    ========================================================================== */

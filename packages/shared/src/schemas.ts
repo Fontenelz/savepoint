@@ -28,6 +28,13 @@ export const loginSchema = z.object({
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 
+/** Retorno do login com Google: o site repassa o código para a API trocar pelos dados da conta. */
+export const googleAuthSchema = z.object({
+  code: z.string().min(1).max(2000),
+  redirectUri: z.string().url().max(500),
+});
+export type GoogleAuthInput = z.infer<typeof googleAuthSchema>;
+
 export const libraryEntrySchema = z.object({
   status: z.enum(PLAY_STATUSES).nullable().optional(),
   rating: rating.nullable().optional(),

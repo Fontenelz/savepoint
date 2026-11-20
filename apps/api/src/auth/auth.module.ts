@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
+import { GoogleAuthService } from './google.service';
 
 @Global()
 @Module({
@@ -17,7 +18,7 @@ import { AuthService } from './auth.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, AuthGuard],
+  providers: [AuthService, GoogleAuthService, AuthGuard],
   exports: [JwtModule, AuthGuard],
 })
 export class AuthModule {}

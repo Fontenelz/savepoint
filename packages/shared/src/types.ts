@@ -16,6 +16,11 @@ export interface AuthResponse {
   user: Viewer;
 }
 
+export interface GoogleAuthResponse extends AuthResponse {
+  /** Conta criada agora (primeiro login com Google). */
+  created: boolean;
+}
+
 export interface Genre {
   id: string;
   slug: string;

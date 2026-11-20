@@ -33,7 +33,10 @@ model User {
   id           String   @id @default(cuid())
   username     String   @unique
   email        String   @unique
-  passwordHash String
+  /// Null para quem só entra pelo Google.
+  passwordHash String?
+  /// "sub" da conta Google (login com Google).
+  googleId     String?  @unique
   displayName  String
   bio          String?
   avatarHue    Int      @default(200)

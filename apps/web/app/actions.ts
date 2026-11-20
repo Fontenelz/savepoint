@@ -19,6 +19,7 @@ import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { TOKEN_COOKIE, api, errorMessage } from '@/lib/api';
+import { safeNext, sessionCookie } from '@/lib/auth';
 
 export type FormState = { error: string | null };
 type Result<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
@@ -32,18 +33,7 @@ async function run<T>(fn: () => Promise<T>): Promise<Result<T>> {
 }
 
 async function startSession(auth: AuthResponse) {
-  (await cookies()).set(TOKEN_COOKIE, auth.token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    maxAge: 60 * 60 * 24 * 30,
-  });
-}
-
-function safeNext(value: FormDataEntryValue | null) {
-  const next = typeof value === 'string' ? value : '';
-  return next.startsWith('/') && !next.startsWith('//') ? next : null;
+  (await cookies()).set(TOKEN_COOKIE, auth.token, sessionCookie);
 }
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
