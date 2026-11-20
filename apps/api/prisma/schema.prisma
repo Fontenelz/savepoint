@@ -77,6 +77,9 @@ model Game {
   /// IDs abertos descobertos via Wikidata (o Steam também habilita importar bibliotecas no futuro).
   wikidataId  String?
   steamAppId  String?
+  /// Avaliações da loja da Steam: % positivas e total. Base da nota sugerida (nunca entra na média do site).
+  steamScore       Int?
+  steamReviewCount Int?
   /// Tempo médio para zerar (curadoria/fonte externa).
   avgHours    Float?
   source      CatalogSource @default(LOCAL)

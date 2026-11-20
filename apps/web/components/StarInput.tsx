@@ -2,24 +2,30 @@
 
 import { useState } from 'react';
 
-/** Avaliação de 0,5 a 5 estrelas. Cada estrela tem duas áreas de clique (metade esquerda/direita). */
+/**
+ * Avaliação de 0,5 a 5 estrelas. Cada estrela tem duas áreas de clique (metade esquerda/direita).
+ * `suggested`: nota pré-preenchida (ex.: sugerida pela Steam) mostrada apagada até o usuário escolher.
+ */
 export function StarInput({
   value,
   onChange,
   size = 26,
   disabled,
+  suggested,
 }: {
   value: number | null;
+  suggested?: number | null;
   onChange: (v: number | null) => void;
   size?: number;
   disabled?: boolean;
 }) {
   const [hover, setHover] = useState<number | null>(null);
-  const shown = hover ?? value ?? 0;
+  const shown = hover ?? value ?? suggested ?? 0;
+  const isSuggested = !value && !hover && Boolean(suggested);
 
   return (
     <div
-      className={`star-input ${hover ? 'preview' : ''}`}
+      className={`star-input ${hover ? 'preview' : ''} ${isSuggested ? 'is-suggested' : ''}`}
       style={{ fontSize: size }}
       onMouseLeave={() => setHover(null)}
       role="radiogroup"

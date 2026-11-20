@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import type { GameSummary, ListSummary, LogView, UserGameState } from '@savepoint/shared';
+import { PLAYED_STATUSES, type GameSummary, type ListSummary, type LogView, type UserGameState } from '@savepoint/shared';
 
 /** Selects e conversores reutilizados por vários módulos (Prisma → contrato da API). */
 
@@ -18,6 +18,10 @@ export const gameSummarySelect = {
   coverUrl: true,
   developer: true,
   ratingAvg: true,
+  // Não vão para o GameSummary; estão aqui para quem junta `game` ao estado da estante
+  // (userGameStateSelect + game: gameSummarySelect) ainda conseguir calcular a nota sugerida.
+  steamScore: true,
+  steamReviewCount: true,
   platforms: { select: { short: true }, orderBy: { sortOrder: 'asc' } },
   genres: { select: { name: true }, orderBy: { name: 'asc' }, take: 1 },
 } satisfies Prisma.GameSelect;
@@ -120,15 +124,31 @@ export const userGameStateSelect = {
   hoursPlayed: true,
   startedAt: true,
   finishedAt: true,
+  game: { select: { steamScore: true, steamReviewCount: true } },
 } satisfies Prisma.UserGameSelect;
 
 type StateRow = Prisma.UserGameGetPayload<{ select: typeof userGameStateSelect }>;
 
-export function toUserGameState(s: StateRow): UserGameState {
+/** Abaixo disso a % da Steam oscila demais para virar sugestão. */
+const MIN_STEAM_REVIEWS = 20;
+
+/** % de avaliações positivas → nota de 1 a 10 (96% → 10 = 5★, 91% → 9, 75% → 8, 50% → 5). */
+export function steamScoreToRating(score: number) {
+  return Math.min(10, Math.max(1, Math.round(score / 10)));
+}
+
+export function toUserGameState({ game, ...s }: StateRow): UserGameState {
+  // Só sugere para quem já jogou (status de jogado ou horas) e ainda não deu nota.
+  const played = (s.status != null && PLAYED_STATUSES.includes(s.status)) || (s.hoursPlayed ?? 0) > 0;
+  const suggested =
+    s.rating == null && played && game.steamScore != null && (game.steamReviewCount ?? 0) >= MIN_STEAM_REVIEWS
+      ? { rating: steamScoreToRating(game.steamScore), steamScore: game.steamScore }
+      : null;
   return {
     ...s,
     startedAt: toDateString(s.startedAt),
     finishedAt: toDateString(s.finishedAt),
+    suggested,
   };
 }
 

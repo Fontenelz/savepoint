@@ -25,7 +25,8 @@ export function LogDialog({
   defaults: UserGameState;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
-  const [rating, setRating] = useState<number | null>(defaults.rating);
+  // Sem nota própria, abre com a sugerida (Steam) já marcada: o usuário só ajusta se quiser.
+  const [rating, setRating] = useState<number | null>(defaults.rating ?? defaults.suggested?.rating ?? null);
   const [liked, setLiked] = useState(defaults.liked);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -34,13 +35,13 @@ export function LogDialog({
     const d = ref.current;
     if (!d) return;
     if (open && !d.open) {
-      setRating(defaults.rating);
+      setRating(defaults.rating ?? defaults.suggested?.rating ?? null);
       setLiked(defaults.liked);
       setError(null);
       d.showModal();
     }
     if (!open && d.open) d.close();
-  }, [open, defaults.rating, defaults.liked]);
+  }, [open, defaults.rating, defaults.suggested?.rating, defaults.liked]);
 
   function submit(form: FormData) {
     const hours = form.get('hours');

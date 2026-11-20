@@ -9,7 +9,8 @@ import { CatalogDetailsService } from './details.service';
  * (loja da Steam → Wikipedia).
  * Só preenche o que está vazio; pode rodar quantas vezes quiser.
  *
- * pnpm catalog:enrich
+ * pnpm catalog:enrich                    → também busca as avaliações da Steam que faltam
+ * pnpm catalog:enrich --refresh-scores   → atualiza as avaliações da Steam de todos os jogos
  */
 async function main() {
   const app = await NestFactory.createApplicationContext(AppModule, { logger: ['error', 'warn'] });
@@ -44,6 +45,16 @@ async function main() {
       `(${count((r) => r.summary === 'steam')} da Steam, ${count((r) => r.summary === 'wikipedia')} da Wikipedia) · ` +
       `${count((r) => r.avgHours)} tempos médios · ${count((r) => r.steamAppId)} ids da Steam`,
   );
+
+  // Depois do enrich: ele pode ter acabado de descobrir novos ids da Steam.
+  const refresh = process.argv.includes('--refresh-scores');
+  console.log(`\n👍 Avaliações da Steam (base da nota sugerida)${refresh ? ' [todas]' : ''}\n`);
+  const scores = await details.fillSteamScores({
+    refresh,
+    onProgress: (title, score, i, total) =>
+      console.log(`  [${String(i + 1).padStart(String(total).length)}/${total}] ${title} — ${score != null ? `${score}% positivas` : '· sem avaliações'}`),
+  });
+  console.log(`\n✅ ${scores.filled} de ${scores.total} jogos com avaliações da Steam`);
   await app.close();
   process.exit(0);
 }

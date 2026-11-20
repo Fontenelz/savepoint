@@ -56,6 +56,11 @@ export interface UserGameState {
   hoursPlayed: number | null;
   startedAt: string | null;
   finishedAt: string | null;
+  /**
+   * Nota sugerida a partir das avaliações da Steam, para jogos já jogados que ainda não têm nota.
+   * Não é a nota do usuário: não entra em médias até ele confirmar (gravando em `rating`).
+   */
+  suggested: { rating: number; steamScore: number } | null;
 }
 
 export interface LogView {

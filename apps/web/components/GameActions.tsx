@@ -25,6 +25,7 @@ const EMPTY: UserGameState = {
   hoursPlayed: null,
   startedAt: null,
   finishedAt: null,
+  suggested: null,
 };
 
 const OPEN_LOG_EVENT = 'sp:open-log';
@@ -132,6 +133,8 @@ export function GameActions({
   }
 
   const hasEntry = state.status || state.rating || state.liked || state.favoriteRank;
+  // Some assim que o usuário dá a própria nota (o servidor também para de mandar).
+  const suggested = state.rating ? null : state.suggested;
 
   return (
     <div className="actions" aria-busy={pending}>
@@ -157,9 +160,17 @@ export function GameActions({
         <div className="actions-row">
           <div>
             <div className="label" style={{ marginBottom: 4 }}>
-              {state.rating ? 'Sua nota' : 'Avaliar'}
+              {state.rating ? 'Sua nota' : suggested ? 'Nota sugerida' : 'Avaliar'}
             </div>
-            <StarInput value={state.rating} onChange={(rating) => save({ rating })} />
+            <StarInput value={state.rating} suggested={suggested?.rating} onChange={(rating) => save({ rating })} />
+            {suggested && (
+              <div className="suggested-note">
+                <span title="Calculada a partir das avaliações da loja da Steam">Steam: {suggested.steamScore}% positivas</span>
+                <button type="button" onClick={() => save({ rating: suggested.rating })}>
+                  Confirmar
+                </button>
+              </div>
+            )}
           </div>
           <div style={{ display: 'flex' }}>
             <button
