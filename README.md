@@ -112,7 +112,7 @@ Todas ficam em `apps/api/.env` (veja os comentários em `.env.example`). Sem ela
 
 ## Scripts
 
-Na raiz:
+Todos rodam da raiz do monorepo:
 
 | Comando | O que faz |
 | --- | --- |
@@ -124,14 +124,9 @@ Na raiz:
 | `pnpm db:seed` | Catálogo curado, usuários demo e busca de capas |
 | `pnpm db:reset` | Recria o banco e roda o seed de novo |
 | `pnpm catalog:sync` | Busca capas e banners para o catálogo |
-
-Só na API (`pnpm --filter @savepoint/api <script>`):
-
-| Script | O que faz |
-| --- | --- |
-| `catalog:import` | Importação em massa do IGDB (`--limit 500`) ou da RAWG (`--source rawg`, `--offset 200`) |
-| `catalog:enrich` | Completa jogos importados: id da Steam, tempo médio, sinopse em português |
-| `stats:refresh` | Recalcula as estatísticas desnormalizadas dos jogos |
+| `pnpm catalog:import` | Importação em massa do IGDB (`--limit 500`) ou da RAWG (`--source rawg`, `--offset 200`) |
+| `pnpm catalog:enrich` | Completa jogos importados: id da Steam, tempo médio, sinopse em português |
+| `pnpm stats:refresh` | Recalcula as estatísticas desnormalizadas dos jogos |
 
 ## Próximos passos sugeridos
 

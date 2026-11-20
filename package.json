@@ -11,7 +11,10 @@
     "db:migrate": "pnpm --filter @savepoint/api db:migrate",
     "db:seed": "pnpm --filter @savepoint/api db:seed",
     "db:reset": "pnpm --filter @savepoint/api db:reset",
-    "catalog:sync": "pnpm --filter @savepoint/api catalog:sync"
+    "catalog:sync": "pnpm --filter @savepoint/api catalog:sync",
+    "catalog:import": "pnpm --filter @savepoint/api catalog:import",
+    "catalog:enrich": "pnpm --filter @savepoint/api catalog:enrich",
+    "stats:refresh": "pnpm --filter @savepoint/api stats:refresh"
   },
   "devDependencies": {
     "turbo": "^2.5.6",
