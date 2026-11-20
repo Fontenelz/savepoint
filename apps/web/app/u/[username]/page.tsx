@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Histogram, Poster, SectionHead, ShelfBar, Stars } from '@/components/bits';
 import { Icon } from '@/components/Icon';
+import { FavoritesEditor } from '@/components/FavoritesEditor';
 import { Review } from '@/components/Review';
 import { QueueSection } from '@/components/QueueCarousel';
 import { Slider } from '@/components/Slider';
@@ -33,19 +34,21 @@ export default async function ProfilePage({ params }: Props) {
   return (
     <div className="two-col">
       <div>
-        <section className="section">
-          <SectionHead title="Top 4" />
-          <div className="favorites">
-            {profile.favorites.map((g) => (
-              <Poster key={g.id} game={g} />
-            ))}
-            {Array.from({ length: MAX_FAVORITES - profile.favorites.length }, (_, i) => (
-              <div key={i} className="fav-slot">
-                {profile.isMe ? 'Marque ★ Top 4 na página de um jogo' : ''}
-              </div>
-            ))}
-          </div>
-        </section>
+        {profile.isMe ? (
+          <FavoritesEditor initial={profile.favorites} username={profile.user.username} />
+        ) : (
+          <section className="section">
+            <SectionHead title="Top 4" />
+            <div className="favorites">
+              {profile.favorites.map((g) => (
+                <Poster key={g.id} game={g} />
+              ))}
+              {Array.from({ length: MAX_FAVORITES - profile.favorites.length }, (_, i) => (
+                <div key={i} className="fav-slot" />
+              ))}
+            </div>
+          </section>
+        )}
 
         <QueueSection data={queue} username={profile.user.username} title="Jogando e na fila" isMe={profile.isMe} />
 

@@ -81,6 +81,13 @@ export async function toggleFavoriteAction(gameId: string, slug: string) {
   return res;
 }
 
+/** Grava o Top 4 inteiro, na ordem recebida (editor do perfil). */
+export async function setFavoritesAction(gameIds: string[], username: string) {
+  const res = await run(() => api<GameSummary[]>('/library/favorites', { method: 'PUT', json: { gameIds } }));
+  if (res.ok) revalidatePath(`/u/${username}`);
+  return res;
+}
+
 export async function createLogAction(input: LogEntryInput, slug: string) {
   const res = await run(() => api<{ id: string }>('/logs', { method: 'POST', json: input }));
   revalidatePath(`/games/${slug}`);

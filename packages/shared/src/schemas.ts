@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { GAME_SORTS, LIBRARY_FILTERS, PLAY_STATUSES } from './enums';
+import { GAME_SORTS, LIBRARY_FILTERS, MAX_FAVORITES, PLAY_STATUSES } from './enums';
 
 const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use o formato AAAA-MM-DD');
 /** Data que não pode estar no futuro (1 dia de folga por causa de fusos horários). */
@@ -69,6 +69,15 @@ export const listSchema = z.object({
 export type ListInput = z.input<typeof listSchema>;
 
 export const listAddItemSchema = z.object({ gameId: z.string().min(1) });
+
+/** Top 4 completo, na ordem de exibição (substitui o atual). */
+export const favoritesSchema = z.object({
+  gameIds: z
+    .array(z.string().min(1))
+    .max(MAX_FAVORITES, `O Top ${MAX_FAVORITES} tem no máximo ${MAX_FAVORITES} jogos`)
+    .refine((ids) => new Set(ids).size === ids.length, 'Um jogo não pode aparecer duas vezes'),
+});
+export type FavoritesInput = z.infer<typeof favoritesSchema>;
 
 export const createGameSchema = z.object({
   title: z.string().trim().min(1, 'Informe o título').max(120),

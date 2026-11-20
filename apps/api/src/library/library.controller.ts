@@ -1,5 +1,11 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query } from '@nestjs/common';
-import { gameIdsQuerySchema, libraryEntrySchema, type LibraryEntryInput } from '@savepoint/shared';
+import {
+  favoritesSchema,
+  gameIdsQuerySchema,
+  libraryEntrySchema,
+  type FavoritesInput,
+  type LibraryEntryInput,
+} from '@savepoint/shared';
 import { Auth, CurrentUser, type AuthUser } from '../auth/auth.guard';
 import { ZodPipe } from '../core/zod.pipe';
 import { LibraryService } from './library.service';
@@ -13,6 +19,12 @@ export class LibraryController {
   @Get('marks')
   marks(@Query(new ZodPipe(gameIdsQuerySchema)) query: { ids: string[] }, @CurrentUser() user: AuthUser) {
     return this.library.marks(user.id, query.ids);
+  }
+
+  /** PUT /library/favorites — grava o Top 4 inteiro (antes de `:gameId`, que capturaria "favorites"). */
+  @Put('favorites')
+  setFavorites(@Body(new ZodPipe(favoritesSchema)) body: FavoritesInput, @CurrentUser() user: AuthUser) {
+    return this.library.setFavorites(user.id, body.gameIds);
   }
 
   @Put(':gameId')
