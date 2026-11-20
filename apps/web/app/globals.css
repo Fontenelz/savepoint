@@ -185,25 +185,9 @@ p {
   color: var(--text);
 }
 
-.logo-mark {
-  display: grid;
-  grid-template-columns: repeat(3, 5px);
-  gap: 2px;
-}
-
-.logo-mark i {
-  width: 5px;
-  height: 5px;
-  background: var(--accent);
-  border-radius: 1px;
-}
-
-.logo-mark i:nth-child(2n) {
-  background: transparent;
-}
-
-.logo-mark i:nth-child(5) {
-  background: var(--heart);
+.logo-flag {
+  flex: none;
+  color: var(--accent);
 }
 
 .nav {

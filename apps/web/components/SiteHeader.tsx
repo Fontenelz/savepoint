@@ -3,15 +3,20 @@ import Link from 'next/link';
 import { Icon } from './Icon';
 import { UserMenu } from './UserMenu';
 
+/** Bandeira de checkpoint: o "ponto de save" do nome. */
+export function LogoFlag({ size = 22 }: { size?: number }) {
+  return (
+    <svg className="logo-flag" width={(size * 22) / 28} height={size} viewBox="0 0 22 28" aria-hidden>
+      <path fill="currentColor" d="M2 1h3.5v20H2zM6.5 1H21l-4 6 4 6H6.5zM3.75 20.5l3 3-3 3-3-3z" />
+    </svg>
+  );
+}
+
 export function Logo() {
   return (
     <Link href="/" className="logo" aria-label="Savepoint — início">
-      <span className="logo-mark" aria-hidden>
-        {Array.from({ length: 9 }, (_, i) => (
-          <i key={i} />
-        ))}
-      </span>
-      savepoint
+      <LogoFlag />
+      Savepoint
     </Link>
   );
 }
