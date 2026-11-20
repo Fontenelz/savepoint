@@ -1,8 +1,14 @@
-import { PlayStatus, PrismaClient } from '@prisma/client';
 import { hash } from 'bcryptjs';
+import postgres from '@prisma/orm-postgres/runtime';
+import { contractFromJson } from '@prisma/orm-postgres/static';
+import type { PlayStatus } from '@savepoint/shared';
 import { GAMES, GENRES, LISTS, PLATFORMS, REVIEWS, TASTES, USERS } from './seed-data';
+import type { Contract } from '../src/prisma/contract.js';
+import contractJson from '../src/prisma/contract.json';
 
-const prisma = new PrismaClient();
+// Script de seed: cliente próprio lendo a mesma DATABASE_URL de sempre
+// (no Compute, o app pega o cliente do serviço: service.load().db.client).
+const db = postgres({ contract: contractFromJson<Contract>(contractJson), url: process.env.DATABASE_URL! });
 const DEMO_PASSWORD = 'savepoint123';
 
 /** RNG determinístico: o seed gera sempre os mesmos dados. */
@@ -23,43 +29,42 @@ const daysAgo = (d: number) => {
   date.setUTCDate(date.getUTCDate() - d);
   return date;
 };
+const day = (d: Date) => d.toISOString().slice(0, 10);
 
 async function main() {
   console.log('🧹 Limpando banco...');
-  await prisma.$transaction([
-    prisma.reviewLike.deleteMany(),
-    prisma.listItem.deleteMany(),
-    prisma.gameList.deleteMany(),
-    prisma.logEntry.deleteMany(),
-    prisma.userGame.deleteMany(),
-    prisma.follow.deleteMany(),
-    prisma.game.deleteMany(),
-    prisma.genre.deleteMany(),
-    prisma.platform.deleteMany(),
-    prisma.user.deleteMany(),
-  ]);
+  await db.transaction(async (tx) => {
+    await tx.orm.public.ReviewLike.where((r) => r.id.isNotNull()).deleteAll();
+    await tx.orm.public.ListItem.where((r) => r.id.isNotNull()).deleteAll();
+    await tx.orm.public.GameList.where((r) => r.id.isNotNull()).deleteAll();
+    await tx.orm.public.LogEntry.where((r) => r.id.isNotNull()).deleteAll();
+    await tx.orm.public.UserGame.where((r) => r.id.isNotNull()).deleteAll();
+    await tx.orm.public.Follow.where((r) => r.followerId.isNotNull()).deleteAll();
+    await tx.orm.public.Game.where((r) => r.id.isNotNull()).deleteAll();
+    await tx.orm.public.Genre.where((r) => r.id.isNotNull()).deleteAll();
+    await tx.orm.public.Platform.where((r) => r.id.isNotNull()).deleteAll();
+    await tx.orm.public.User.where((r) => r.id.isNotNull()).deleteAll();
+  });
 
   console.log('🕹️  Plataformas e gêneros...');
-  for (const p of PLATFORMS) await prisma.platform.create({ data: { ...p } });
-  for (const [slug, name] of GENRES) await prisma.genre.create({ data: { slug, name } });
-  const platforms = new Map((await prisma.platform.findMany()).map((p) => [p.slug, p.id]));
+  for (const p of PLATFORMS) await db.orm.public.Platform.create({ ...p });
+  for (const [slug, name] of GENRES) await db.orm.public.Genre.create({ slug, name });
+  const platforms = new Map((await db.orm.public.Platform.select('slug', 'id').all()).map((p) => [p.slug, p.id]));
 
   console.log(`📚 ${GAMES.length} jogos...`);
   const games = new Map<string, { id: string; data: (typeof GAMES)[number] }>();
   for (const g of GAMES) {
-    const created = await prisma.game.create({
-      data: {
-        slug: g.slug,
-        title: g.title,
-        releaseYear: g.year,
-        developer: g.dev,
-        publisher: g.pub ?? g.dev,
-        summary: g.summary,
-        avgHours: g.hours,
-        source: 'LOCAL',
-        genres: { connect: g.genres.map((slug) => ({ slug })) },
-        platforms: { connect: g.platforms.map((slug) => ({ slug })) },
-      },
+    const created = await db.orm.public.Game.create({
+      slug: g.slug,
+      title: g.title,
+      releaseYear: g.year,
+      developer: g.dev,
+      publisher: g.pub ?? g.dev,
+      summary: g.summary,
+      avgHours: g.hours,
+      source: 'LOCAL',
+      genres: (x) => x.connect(g.genres.map((slug) => ({ slug }))),
+      platforms: (x) => x.connect(g.platforms.map((slug) => ({ slug }))),
     });
     games.set(g.slug, { id: created.id, data: g });
   }
@@ -68,15 +73,13 @@ async function main() {
   const passwordHash = await hash(DEMO_PASSWORD, 10);
   const users = new Map<string, string>();
   for (const u of USERS) {
-    const created = await prisma.user.create({
-      data: {
-        username: u.username,
-        email: `${u.username}@savepoint.dev`,
-        displayName: u.displayName,
-        bio: u.bio,
-        avatarHue: u.hue,
-        passwordHash,
-      },
+    const created = await db.orm.public.User.create({
+      username: u.username,
+      email: `${u.username}@savepoint.dev`,
+      displayName: u.displayName,
+      bio: u.bio,
+      avatarHue: u.hue,
+      passwordHash,
     });
     users.set(u.username, created.id);
   }
@@ -121,19 +124,17 @@ async function main() {
       const finished = status === 'COMPLETED' || status === 'MASTERED';
       const isFav = finished && rating !== null && rating >= 9 && favorites < 4 && rand() < 0.7;
 
-      await prisma.userGame.create({
-        data: {
-          userId,
-          gameId: g.id,
-          status,
-          rating,
-          liked: rating !== null && rating >= 8 && rand() < 0.8,
-          favoriteRank: isFav ? ++favorites : null,
-          platformId,
-          hoursPlayed: hours,
-          startedAt: status === 'BACKLOG' ? null : daysAgo(finishedDay + Math.floor(rand() * 40) + 5),
-          finishedAt: finished ? daysAgo(finishedDay) : null,
-        },
+      await db.orm.public.UserGame.create({
+        userId,
+        gameId: g.id,
+        status,
+        rating,
+        liked: rating !== null && rating >= 8 && rand() < 0.8,
+        favoriteRank: isFav ? ++favorites : null,
+        platformId,
+        hoursPlayed: hours,
+        startedAt: status === 'BACKLOG' ? null : day(daysAgo(finishedDay + Math.floor(rand() * 40) + 5)),
+        finishedAt: finished ? day(daysAgo(finishedDay)) : null,
       });
 
       if (status === 'BACKLOG') continue;
@@ -148,21 +149,19 @@ async function main() {
         const tier = (rating ?? 5) >= 8 ? 'high' : (rating ?? 5) >= 5 ? 'mid' : 'low';
         const withReview = rand() < (e.finished ? 0.55 : 0.25);
         const playedOn = daysAgo(e.day);
-        const log = await prisma.logEntry.create({
-          data: {
-            userId,
-            gameId: g.id,
-            playedOn,
-            createdAt: new Date(playedOn.getTime() + 1000 * 60 * 60 * (12 + Math.floor(rand() * 10))),
-            platformId,
-            hours,
-            finished: e.finished,
-            replay: e.replay,
-            rating,
-            liked: rating !== null && rating >= 8,
-            review: withReview ? pick(REVIEWS[tier]) : null,
-            spoiler: withReview && rand() < 0.08,
-          },
+        const log = await db.orm.public.LogEntry.create({
+          userId,
+          gameId: g.id,
+          playedOn: day(playedOn),
+          createdAt: new Date(playedOn.getTime() + 1000 * 60 * 60 * (12 + Math.floor(rand() * 10))),
+          platformId,
+          hours,
+          finished: e.finished,
+          replay: e.replay,
+          rating,
+          liked: rating !== null && rating >= 8,
+          review: withReview ? pick(REVIEWS[tier]) : null,
+          spoiler: withReview && rand() < 0.08,
         });
         if (withReview) logIds.push(log.id);
       }
@@ -173,38 +172,44 @@ async function main() {
   const ids = [...users.values()];
   for (const a of ids) {
     for (const b of ids) {
-      if (a !== b && rand() < 0.7) await prisma.follow.create({ data: { followerId: a, followingId: b } });
+      if (a !== b && rand() < 0.7) await db.orm.public.Follow.create({ followerId: a, followingId: b });
     }
   }
   for (const logId of logIds) {
     for (const u of ids) {
-      if (rand() < 0.35) await prisma.reviewLike.create({ data: { userId: u, logId } }).catch(() => undefined);
+      await db.orm.public.ReviewLike.create({ userId: u, logId }).catch(() => undefined);
     }
   }
 
   console.log('📝 Listas...');
   for (const l of LISTS) {
-    await prisma.gameList.create({
-      data: {
-        userId: users.get(l.owner)!,
-        title: l.title,
-        description: l.description,
-        ranked: l.ranked,
-        items: { create: l.games.map((slug, i) => ({ gameId: games.get(slug)!.id, position: i + 1 })) },
-      },
+    await db.orm.public.GameList.create({
+      userId: users.get(l.owner)!,
+      title: l.title,
+      description: l.description,
+      ranked: l.ranked,
+      items: (i) => i.create(l.games.map((slug, i) => ({ gameId: games.get(slug)!.id, position: i + 1 }))),
     });
   }
 
   console.log('📊 Recalculando estatísticas...');
   for (const { id } of games.values()) {
     const [ratings, playerCount, likeCount] = await Promise.all([
-      prisma.userGame.aggregate({ where: { gameId: id, rating: { not: null } }, _avg: { rating: true }, _count: { rating: true } }),
-      prisma.userGame.count({ where: { gameId: id, status: { not: null } } }),
-      prisma.userGame.count({ where: { gameId: id, liked: true } }),
+      db.orm.public.UserGame
+        .where({ gameId: id })
+        .where((ug) => ug.rating.isNotNull())
+        .aggregate((a) => ({ avg: a.avg('rating'), n: a.count() })),
+      db.orm.public.UserGame
+        .where({ gameId: id })
+        .where((ug) => ug.status.isNotNull())
+        .aggregate((a) => ({ n: a.count() })),
+      db.orm.public.UserGame.where({ gameId: id, liked: true }).aggregate((a) => ({ n: a.count() })),
     ]);
-    await prisma.game.update({
-      where: { id },
-      data: { ratingAvg: ratings._avg.rating, ratingCount: ratings._count.rating, playerCount, likeCount },
+    await db.orm.public.Game.where({ id }).update({
+      ratingAvg: ratings.avg,
+      ratingCount: ratings.n,
+      playerCount: playerCount.n,
+      likeCount: likeCount.n,
     });
   }
 
@@ -216,4 +221,4 @@ main()
     console.error(e);
     process.exit(1);
   })
-  .finally(() => prisma.$disconnect());
+  .finally(() => db.close());

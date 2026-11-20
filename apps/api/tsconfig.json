@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "strict": true,
@@ -13,5 +13,5 @@
     "outDir": "./dist",
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src", "prisma"]
+  "include": ["src"]
 }

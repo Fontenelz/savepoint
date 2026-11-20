@@ -5,6 +5,7 @@ import { mkdirSync } from 'node:fs';
 import { AppModule } from './app.module';
 import { MediaService } from './core/media.service';
 import { PrismaExceptionFilter } from './core/prisma-exception.filter';
+import { webOrigin } from './core/runtime';
 
 /**
  * Cria e configura o app Nest. Usado tanto pelo servidor local (main.ts)
@@ -18,7 +19,8 @@ export async function createApp(): Promise<NestFastifyApplication> {
   app.setGlobalPrefix('api');
   app.useGlobalFilters(new PrismaExceptionFilter());
   app.enableCors({
-    origin: (process.env.WEB_ORIGIN ?? 'http://localhost:3000').split(','),
+    // Origem pública do site, do input do serviço do Composer (CORS).
+    origin: webOrigin.split(','),
     credentials: true,
   });
 

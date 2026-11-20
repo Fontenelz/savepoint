@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from './prisma.service';
+import { db } from './runtime';
 
 /**
  * Mantém as estatísticas desnormalizadas de cada jogo (média, nº de jogadores, likes).
@@ -7,27 +7,26 @@ import { PrismaService } from './prisma.service';
  */
 @Injectable()
 export class StatsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor() {}
 
   async refreshGame(gameId: string) {
     const [ratings, playerCount, likeCount] = await Promise.all([
-      this.prisma.userGame.aggregate({
-        where: { gameId, rating: { not: null } },
-        _avg: { rating: true },
-        _count: { rating: true },
-      }),
-      this.prisma.userGame.count({ where: { gameId, status: { not: null } } }),
-      this.prisma.userGame.count({ where: { gameId, liked: true } }),
+      db.orm.public.UserGame
+        .where({ gameId })
+        .where((ug) => ug.rating.isNotNull())
+        .aggregate((a) => ({ avg: a.avg('rating'), n: a.count() })),
+      db.orm.public.UserGame
+        .where({ gameId })
+        .where((ug) => ug.status.isNotNull())
+        .aggregate((a) => ({ n: a.count() })),
+      db.orm.public.UserGame.where({ gameId, liked: true }).aggregate((a) => ({ n: a.count() })),
     ]);
 
-    await this.prisma.game.update({
-      where: { id: gameId },
-      data: {
-        ratingAvg: ratings._avg.rating,
-        ratingCount: ratings._count.rating,
-        playerCount,
-        likeCount,
-      },
+    await db.orm.public.Game.where({ id: gameId }).update({
+      ratingAvg: ratings.avg,
+      ratingCount: ratings.n,
+      playerCount: playerCount.n,
+      likeCount: likeCount.n,
     });
   }
 }

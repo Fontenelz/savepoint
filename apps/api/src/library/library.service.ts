@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { MAX_FAVORITES, type LibraryEntryInput, type UserGameState, type ViewerGameMark } from '@savepoint/shared';
-import { fromDateString, toUserGameState, userGameStateSelect } from '../core/mappers';
+import { toUserGameState, userGameStateFields } from '../core/mappers';
+import { db } from '../core/runtime';
 import { PrismaService } from '../core/prisma.service';
 import { StatsService } from '../core/stats.service';
 
@@ -20,78 +21,85 @@ export class LibraryService {
       liked: input.liked,
       platformId: input.platformId,
       hoursPlayed: input.hoursPlayed,
-      startedAt: fromDateString(input.startedAt),
-      finishedAt: fromDateString(input.finishedAt),
+      startedAt: input.startedAt,
+      finishedAt: input.finishedAt,
     };
 
     // Ao marcar como zerado pela primeira vez, registra a data automaticamente.
     if ((input.status === 'COMPLETED' || input.status === 'MASTERED') && input.finishedAt === undefined) {
-      const current = await this.prisma.userGame.findUnique({
-        where: { userId_gameId: { userId, gameId } },
-        select: { finishedAt: true },
-      });
-      if (!current?.finishedAt) data.finishedAt = new Date(new Date().toISOString().slice(0, 10));
+      const current = await db.orm.public.UserGame
+        .where({ userId, gameId })
+        .select('finishedAt')
+        .first();
+      if (!current?.finishedAt) data.finishedAt = new Date().toISOString().slice(0, 10);
     }
     if (input.status === 'PLAYING' && input.startedAt === undefined) {
-      const current = await this.prisma.userGame.findUnique({
-        where: { userId_gameId: { userId, gameId } },
-        select: { startedAt: true },
-      });
-      if (!current?.startedAt) data.startedAt = new Date(new Date().toISOString().slice(0, 10));
+      const current = await db.orm.public.UserGame
+        .where({ userId, gameId })
+        .select('startedAt')
+        .first();
+      if (!current?.startedAt) data.startedAt = new Date().toISOString().slice(0, 10);
     }
 
-    const entry = await this.prisma.userGame.upsert({
-      where: { userId_gameId: { userId, gameId } },
-      create: { userId, gameId, ...data },
-      update: data,
-      select: userGameStateSelect,
-    });
+    const entry = await db.orm.public.UserGame
+      .select(...userGameStateFields)
+      .upsert({
+        create: { userId, gameId, ...data },
+        update: data,
+        conflictOn: { userId, gameId } as unknown as { id: string },
+      });
     await this.stats.refreshGame(gameId);
     return toUserGameState(entry);
   }
 
   async remove(userId: string, gameId: string) {
-    await this.prisma.userGame.deleteMany({ where: { userId, gameId } });
+    await db.orm.public.UserGame.where({ userId, gameId }).deleteAll();
     await this.stats.refreshGame(gameId);
   }
 
   /** Adiciona/remove do Top 4 do perfil. */
   async toggleFavorite(userId: string, gameId: string): Promise<UserGameState> {
     await this.ensureGame(gameId);
-    const current = await this.prisma.userGame.findUnique({
-      where: { userId_gameId: { userId, gameId } },
-      select: { favoriteRank: true },
-    });
+    const current = await db.orm.public.UserGame
+      .where({ userId, gameId })
+      .select('favoriteRank')
+      .first();
 
     if (current?.favoriteRank) {
       const removed = current.favoriteRank;
-      return this.prisma.$transaction(async (tx) => {
-        const entry = await tx.userGame.update({
-          where: { userId_gameId: { userId, gameId } },
-          data: { favoriteRank: null },
-          select: userGameStateSelect,
-        });
+      const entry = await db.transaction(async (tx) => {
+        const updated = await tx.orm.public.UserGame
+          .where({ userId, gameId })
+          .select(...userGameStateFields)
+          .update({ favoriteRank: null });
         // Mantém o Top 4 sem buracos: 1, 2, 3...
-        const rest = await tx.userGame.findMany({
-          where: { userId, favoriteRank: { gt: removed } },
-          orderBy: { favoriteRank: 'asc' },
-          select: { id: true, favoriteRank: true },
-        });
-        for (const r of rest) await tx.userGame.update({ where: { id: r.id }, data: { favoriteRank: r.favoriteRank! - 1 } });
-        return toUserGameState(entry);
+        const rest = await tx.orm.public.UserGame
+          .where({ userId })
+          .where((ug) => ug.favoriteRank.gt(removed))
+          .orderBy((ug) => ug.favoriteRank.asc())
+          .select('id', 'favoriteRank')
+          .all();
+        for (const r of rest)
+          await tx.orm.public.UserGame.where({ id: r.id }).update({ favoriteRank: r.favoriteRank! - 1 });
+        return updated;
       });
+      return toUserGameState(entry!);
     }
 
-    const used = await this.prisma.userGame.count({ where: { userId, favoriteRank: { not: null } } });
-    if (used >= MAX_FAVORITES) {
+    const used = await db.orm.public.UserGame
+      .where({ userId })
+      .where((ug) => ug.favoriteRank.isNotNull())
+      .aggregate((a) => ({ n: a.count() }));
+    if (used.n >= MAX_FAVORITES) {
       throw new BadRequestException(`Seu Top ${MAX_FAVORITES} está cheio. Remova um favorito primeiro.`);
     }
-    const entry = await this.prisma.userGame.upsert({
-      where: { userId_gameId: { userId, gameId } },
-      create: { userId, gameId, favoriteRank: used + 1 },
-      update: { favoriteRank: used + 1 },
-      select: userGameStateSelect,
-    });
+    const entry = await db.orm.public.UserGame
+      .select(...userGameStateFields)
+      .upsert({
+        create: { userId, gameId, favoriteRank: used.n + 1 },
+        update: { favoriteRank: used.n + 1 },
+        conflictOn: { userId, gameId } as unknown as { id: string },
+      });
     return toUserGameState(entry);
   }
 
@@ -99,15 +107,18 @@ export class LibraryService {
   async marks(userId: string, gameIds: string[]): Promise<Record<string, ViewerGameMark>> {
     if (!gameIds.length) return {};
     const [entries, listed] = await Promise.all([
-      this.prisma.userGame.findMany({
-        where: { userId, gameId: { in: gameIds } },
-        select: { gameId: true, status: true, rating: true, liked: true },
-      }),
-      this.prisma.listItem.findMany({
-        where: { gameId: { in: gameIds }, list: { userId } },
-        select: { gameId: true },
-        distinct: ['gameId'],
-      }),
+      db.orm.public.UserGame
+        .where({ userId })
+        .where((ug) => ug.gameId.in(gameIds))
+        .select('gameId', 'status', 'rating', 'liked')
+        .all(),
+      db.orm.public.ListItem
+        .where((i) => i.gameId.in(gameIds))
+        .where(((i: any) => i.list.userId.eq(userId)) as never)
+        .orderBy((i) => i.gameId.asc())
+        .distinctOn('gameId')
+        .select('gameId')
+        .all(),
     ]);
     const inList = new Set(listed.map((l) => l.gameId));
     const out: Record<string, ViewerGameMark> = {};
@@ -117,7 +128,7 @@ export class LibraryService {
   }
 
   private async ensureGame(gameId: string) {
-    const game = await this.prisma.game.findUnique({ where: { id: gameId }, select: { id: true } });
+    const game = await db.orm.public.Game.where({ id: gameId }).select('id').first();
     if (!game) throw new NotFoundException('Jogo não encontrado');
   }
 }

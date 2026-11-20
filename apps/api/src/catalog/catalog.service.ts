@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { not, or } from '@prisma/orm-postgres/orm-client';
 import { slugify, type CatalogStatus, type ExternalGameResult } from '@savepoint/shared';
+import { db } from '../core/runtime';
 import { MediaService } from '../core/media.service';
 import { PrismaService } from '../core/prisma.service';
 import { GamesService } from '../games/games.service';
@@ -49,10 +50,10 @@ export class CatalogService {
   async search(q: string): Promise<ExternalGameResult[]> {
     const provider = this.provider();
     const results = await provider.search(q);
-    const imported = await this.prisma.game.findMany({
-      where: { igdbId: { in: results.map((r) => r.externalId) } },
-      select: { igdbId: true, slug: true },
-    });
+    const imported = await db.orm.public.Game
+      .where((g) => g.igdbId.in(results.map((r) => r.externalId)))
+      .select('igdbId', 'slug')
+      .all();
     const byId = new Map(imported.map((g) => [g.igdbId, g.slug]));
     return results.map((r) => ({
       externalId: r.externalId,
@@ -67,7 +68,7 @@ export class CatalogService {
   /** Copia o jogo para o banco local (idempotente). */
   async import(externalId: string, userId: string | null): Promise<{ slug: string }> {
     const provider = this.provider();
-    const existing = await this.prisma.game.findUnique({ where: { igdbId: externalId }, select: { slug: true } });
+    const existing = await db.orm.public.Game.where({ igdbId: externalId }).select('slug').first();
     if (existing) return existing;
 
     const ext = await provider.fetch(externalId);
@@ -76,24 +77,22 @@ export class CatalogService {
     const [genreIds, platformIds] = await Promise.all([this.upsertGenres(ext), this.upsertPlatforms(ext)]);
     const slug = await this.games.uniqueSlug(ext.title, ext.releaseYear);
 
-    await this.prisma.game.create({
-      data: {
-        slug,
-        title: ext.title,
-        summary: ext.summary,
-        releaseYear: ext.releaseYear,
-        developer: ext.developer,
-        publisher: ext.publisher,
-        coverUrl: ext.coverUrl,
-        backdropUrl: ext.backdropUrl,
-        avgHours: ext.avgHours,
-        source: 'IGDB',
-        externalId: ext.externalId,
-        igdbId: ext.externalId,
-        createdById: userId,
-        genres: { connect: genreIds.map((id) => ({ id })) },
-        platforms: { connect: platformIds.map((id) => ({ id })) },
-      },
+    await db.orm.public.Game.create({
+      slug,
+      title: ext.title,
+      summary: ext.summary,
+      releaseYear: ext.releaseYear,
+      developer: ext.developer,
+      publisher: ext.publisher,
+      coverUrl: ext.coverUrl,
+      backdropUrl: ext.backdropUrl,
+      avgHours: ext.avgHours,
+      source: 'IGDB',
+      externalId: ext.externalId,
+      igdbId: ext.externalId,
+      createdById: userId,
+      genres: (g) => g.connect(genreIds.map((id) => ({ id }))),
+      platforms: (p) => p.connect(platformIds.map((id) => ({ id }))),
     });
     // Baixa as imagens para o armazenamento local (não depender do CDN externo).
     await this.enrichGame(slug).catch(() => undefined);
@@ -105,16 +104,33 @@ export class CatalogService {
    * o armazenamento local e grava IDs externos. Textos locais (sinopses PT-BR) são mantidos.
    */
   async enrichGame(slug: string, opts: { force?: boolean; patient?: boolean } = {}): Promise<EnrichResult> {
-    const g = await this.prisma.game.findUnique({
-      where: { slug },
-      select: {
-        id: true, slug: true, title: true, releaseYear: true, coverUrl: true, backdropUrl: true,
-        developer: true, publisher: true, igdbId: true, wikidataId: true, steamAppId: true,
-      },
-    });
+    const g = await db.orm.public.Game
+      .where({ slug })
+      .select(
+        'id',
+        'slug',
+        'title',
+        'releaseYear',
+        'coverUrl',
+        'backdropUrl',
+        'developer',
+        'publisher',
+        'igdbId',
+        'wikidataId',
+        'steamAppId',
+      )
+      .first();
     if (!g) throw new NotFoundException('Jogo não encontrado');
 
-    const data: Prisma.GameUpdateInput = {};
+    const data: {
+      coverUrl?: string | null;
+      backdropUrl?: string | null;
+      wikidataId?: string | null;
+      steamAppId?: string | null;
+      igdbId?: string | null;
+      developer?: string | null;
+      publisher?: string | null;
+    } = {};
     let cover = this.media.isStored(g.coverUrl) && !opts.force ? g.coverUrl : null;
     let backdrop = this.media.isStored(g.backdropUrl) && !opts.force ? g.backdropUrl : null;
     let source: string | null = null;
@@ -159,36 +175,33 @@ export class CatalogService {
       if (found.refs.wikidataId && !g.wikidataId) data.wikidataId = found.refs.wikidataId;
       if (found.refs.steamAppId && !g.steamAppId) data.steamAppId = found.refs.steamAppId;
       if (found.refs.igdbId && !g.igdbId) {
-        const taken = await this.prisma.game.findUnique({ where: { igdbId: found.refs.igdbId }, select: { id: true } });
+        const taken = await db.orm.public.Game.where({ igdbId: found.refs.igdbId }).select('id').first();
         if (!taken) data.igdbId = found.refs.igdbId;
       }
       if (!g.developer && found.developer) data.developer = found.developer;
       if (!g.publisher && found.publisher) data.publisher = found.publisher;
     }
 
-    if (Object.keys(data).length) await this.prisma.game.update({ where: { id: g.id }, data });
+    if (Object.keys(data).length) await db.orm.public.Game.where({ id: g.id }).update(data);
     return { slug: g.slug, title: g.title, cover: Boolean(cover), backdrop: Boolean(backdrop), source, matched };
   }
 
   /** Enriquece todo o catálogo (por padrão só jogos sem capa/banner local). */
   async sync(opts: { force?: boolean; onProgress?: (msg: string) => void } = {}): Promise<SyncReport> {
-    const games = await this.prisma.game.findMany({
-      where: opts.force
-        ? {}
-        : {
-            OR: [
-              { coverUrl: null },
-              { backdropUrl: null },
-              // local: falta baixar o que não está em /media; blob: falta enviar o que ainda é /media ou externo
-              this.media.driver === 'local'
-                ? { NOT: { coverUrl: { startsWith: '/media/' } } }
-                : { NOT: { coverUrl: { contains: '.blob.vercel-storage.com' } } },
-              ...(this.media.driver === 'blob' ? [{ NOT: { backdropUrl: { contains: '.blob.vercel-storage.com' } } }] : []),
-            ],
-          },
-      orderBy: { title: 'asc' },
-      select: { slug: true, title: true },
-    });
+    let query = db.orm.public.Game.select('slug', 'title').orderBy((g) => g.title.asc());
+    if (!opts.force) {
+      // local: falta baixar o que não está em /media; blob: falta enviar o que ainda é /media ou externo
+      const coverPattern = this.media.driver === 'local' ? '/media/%' : '%.blob.vercel-storage.com%';
+      query = query.where((g) =>
+        or(
+          g.coverUrl.isNull(),
+          g.backdropUrl.isNull(),
+          not(g.coverUrl.ilike(coverPattern)),
+          ...(this.media.driver === 'blob' ? [not(g.backdropUrl.ilike('%.blob.vercel-storage.com%'))] : []),
+        ),
+      );
+    }
+    const games = await query.all();
 
     const report: SyncReport = { total: games.length, results: [], failed: [] };
     for (const [i, g] of games.entries()) {
@@ -212,7 +225,7 @@ export class CatalogService {
     for (const name of ext.genres) {
       const slug = slugify(name);
       if (!slug) continue;
-      const g = await this.prisma.genre.upsert({ where: { slug }, create: { slug, name }, update: {}, select: { id: true } });
+      const g = await db.orm.public.Genre.upsert({ create: { slug, name }, update: {}, conflictOn: { slug } as unknown as { id: string } });
       ids.push(g.id);
     }
     return ids;
@@ -222,26 +235,20 @@ export class CatalogService {
     const ids: string[] = [];
     for (const p of ext.platforms) {
       // Tenta casar com plataformas já cadastradas pelo nome curto ou completo.
-      const match = await this.prisma.platform.findFirst({
-        where: {
-          OR: [
-            { short: { equals: p.short, mode: 'insensitive' } },
-            { name: { equals: p.name, mode: 'insensitive' } },
-          ],
-        },
-        select: { id: true },
-      });
+      const match = await db.orm.public.Platform
+        .where((f) => or(f.short.ilike(p.short), f.name.ilike(p.name)))
+        .select('id')
+        .first();
       if (match) {
         ids.push(match.id);
         continue;
       }
       const slug = slugify(p.name);
       if (!slug) continue;
-      const created = await this.prisma.platform.upsert({
-        where: { slug },
+      const created = await db.orm.public.Platform.upsert({
         create: { slug, name: p.name, short: p.short },
         update: {},
-        select: { id: true },
+        conflictOn: { slug } as unknown as { id: string },
       });
       ids.push(created.id);
     }

@@ -2,6 +2,15 @@ packages:
   - "apps/*"
   - "packages/*"
 
+# Resolves the effect constellation to Composer's pin (pnpm 11+ reads it here;
+# the pnpm.overrides block in package.json covers pnpm 10 and other tools).
+overrides:
+  effect: 4.0.5
+  '@effect/vitest': 4.0.5
+  '@effect/platform-bun': 4.0.5
+  '@effect/platform-node': 4.0.5
+  '@effect/platform-node-shared': 4.0.5
+
 allowBuilds:
   '@prisma/client': true
   '@prisma/engines': true

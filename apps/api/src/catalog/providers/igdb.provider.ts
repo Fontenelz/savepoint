@@ -1,7 +1,7 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import type { ArtworkCandidate, ArtworkLookup, ArtworkSource } from './artwork-source';
 import { matchScore, type CatalogProvider, type ExternalGame } from './catalog-provider';
+import { igdbClientId, igdbClientSecret } from '../../core/runtime';
 
 interface IgdbImage {
   image_id: string;
@@ -43,14 +43,13 @@ export class IgdbProvider implements CatalogProvider, ArtworkSource {
   private token: { value: string; expiresAt: number } | null = null;
   private lastRequest = 0;
 
-  constructor(private readonly config: ConfigService) {}
-
   private get clientId() {
-    return this.config.get<string>('IGDB_CLIENT_ID') ?? '';
+    // Credenciais do IGDB, do input do serviço do Composer (opcionais).
+    return igdbClientId;
   }
 
   private get clientSecret() {
-    return this.config.get<string>('IGDB_CLIENT_SECRET') ?? '';
+    return igdbClientSecret;
   }
 
   isEnabled() {

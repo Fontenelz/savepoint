@@ -1,19 +1,24 @@
 {
   "name": "savepoint",
   "private": true,
-  "packageManager": "pnpm@12.11.2",
+  "packageManager": "pnpm@12.18.0",
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
-    "db:migrate": "pnpm --filter @savepoint/api db:migrate",
     "db:seed": "pnpm --filter @savepoint/api db:seed",
-    "db:reset": "pnpm --filter @savepoint/api db:reset",
     "catalog:sync": "pnpm --filter @savepoint/api catalog:sync"
   },
+  "dependencies": {
+    "@prisma/composer": "0.38.0",
+    "@prisma/composer-prisma-cloud": "0.38.0",
+    "@prisma/orm-postgres": "8.0.0-rc.23",
+    "effect": "4.0.5"
+  },
   "devDependencies": {
+    "prisma": "8.0.0-rc.33",
     "turbo": "^2.5.6",
     "typescript": "^5.9.2"
   }

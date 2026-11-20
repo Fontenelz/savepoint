@@ -3,6 +3,7 @@ import { list, put } from '@vercel/blob';
 import { createHash } from 'node:crypto';
 import { mkdir, readdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { blobToken } from './runtime';
 
 export type MediaKind = 'covers' | 'backdrops';
 export type MediaDriver = 'local' | 'blob';
@@ -14,13 +15,13 @@ const MAX_BYTES = 8_000_000;
 /**
  * Armazena as imagens do catálogo (capas e banners) em um de dois lugares:
  *  - local: disco (storage/media), servido pela API em /media/*  → desenvolvimento
- *  - blob:  Vercel Blob, com URL pública própria                → produção (BLOB_READ_WRITE_TOKEN)
+ *  - blob:  Vercel Blob, com URL pública própria                → produção (token do input do serviço)
  * Em ambos os casos o navegador nunca carrega imagens de CDNs de terceiros.
  */
 @Injectable()
 export class MediaService {
   private readonly logger = new Logger(MediaService.name);
-  readonly driver: MediaDriver = process.env.BLOB_READ_WRITE_TOKEN ? 'blob' : 'local';
+  readonly driver: MediaDriver = blobToken ? 'blob' : 'local';
   readonly root = resolve(process.env.MEDIA_DIR ?? join(process.cwd(), 'storage', 'media'));
 
   /** A URL já aponta para o nosso armazenamento (não precisa baixar de novo)? */

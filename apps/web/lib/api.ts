@@ -1,7 +1,7 @@
 import 'server-only';
 import { cookies } from 'next/headers';
+import service from '../service.mjs';
 
-const API_URL = process.env.API_URL ?? 'http://localhost:3333/api';
 export const TOKEN_COOKIE = 'sp_token';
 
 export class ApiError extends Error {
@@ -18,21 +18,24 @@ type ApiInit = Omit<RequestInit, 'body'> & { json?: unknown };
 /**
  * Cliente da API usado só no servidor (Server Components e Server Actions).
  * O JWT fica num cookie httpOnly e nunca é exposto ao JavaScript do navegador.
+ * A API chega como dependência do serviço do Composer (rawHttp), nunca de env.
  */
 export async function api<T>(path: string, init: ApiInit = {}): Promise<T> {
+  const { api: apiDep } = service.load();
+  const { json, ...rest } = init;
   const token = (await cookies()).get(TOKEN_COOKIE)?.value;
   const headers = new Headers(init.headers);
   if (token) headers.set('authorization', `Bearer ${token}`);
 
   let body: string | undefined;
-  if (init.json !== undefined) {
+  if (json !== undefined) {
     headers.set('content-type', 'application/json');
-    body = JSON.stringify(init.json);
+    body = JSON.stringify(json);
   }
 
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, { ...init, headers, body, cache: 'no-store' });
+    res = await apiDep.fetch(`/api${path}`, { ...rest, headers, body, cache: 'no-store' });
   } catch {
     throw new ApiError(503, 'Não foi possível falar com a API. Ela está rodando?');
   }

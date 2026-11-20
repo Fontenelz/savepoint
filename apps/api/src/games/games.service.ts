@@ -1,5 +1,4 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import {
   PLAY_STATUSES,
   slugify,
@@ -13,18 +12,19 @@ import {
   type PlayStatus,
 } from '@savepoint/shared';
 import {
-  gameSummarySelect,
-  listSummarySelect,
-  logSelect,
+  gameSummary,
+  listRows,
+  logRows,
   paged,
   paginate,
   toGameSummary,
   toListSummary,
   toLogView,
   toUserGameState,
-  userGameStateSelect,
-  userSummarySelect,
+  userGameStateFields,
+  userSummaryFields,
 } from '../core/mappers';
+import { db } from '../core/runtime';
 import { PrismaService } from '../core/prisma.service';
 
 const PAGE_SIZE = 42;
@@ -34,119 +34,130 @@ export class GamesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async list(query: GameQuery): Promise<Paginated<GameSummary>> {
-    const where: Prisma.GameWhereInput = {
-      ...(query.q ? { title: { contains: query.q, mode: 'insensitive' } } : {}),
-      ...(query.genre ? { genres: { some: { slug: query.genre } } } : {}),
-      ...(query.platform ? { platforms: { some: { slug: query.platform } } } : {}),
-      ...(query.year ? { releaseYear: query.year } : {}),
-    };
+    let rows = db.orm.public.Game.with(gameSummary);
+    if (query.q) rows = rows.where((g) => g.title.ilike(`%${query.q}%`));
+    const genre = query.genre;
+    const platform = query.platform;
+    if (genre) rows = rows.where((g) => g.genres.some((x) => x.slug.eq(genre)));
+    if (platform) rows = rows.where((g) => g.platforms.some((x) => x.slug.eq(platform)));
+    if (query.year) rows = rows.where({ releaseYear: query.year });
+    if (query.sort === 'popular') rows = rows.orderBy([(g) => g.playerCount.desc(), (g) => g.title.asc()]);
+    else if (query.sort === 'rating')
+      rows = rows.orderBy([(g) => g.ratingAvg.desc({ nulls: 'last' }), (g) => g.ratingCount.desc()]);
+    else if (query.sort === 'recent')
+      rows = rows.orderBy([(g) => g.releaseYear.desc({ nulls: 'last' }), (g) => g.title.asc()]);
+    else rows = rows.orderBy((g) => g.title.asc());
 
-    const orderBy: Prisma.GameOrderByWithRelationInput[] = {
-      popular: [{ playerCount: 'desc' as const }, { title: 'asc' as const }],
-      rating: [{ ratingAvg: { sort: 'desc' as const, nulls: 'last' as const } }, { ratingCount: 'desc' as const }],
-      recent: [{ releaseYear: { sort: 'desc' as const, nulls: 'last' as const } }, { title: 'asc' as const }],
-      title: [{ title: 'asc' as const }],
-    }[query.sort];
-
-    const [rows, total] = await Promise.all([
-      this.prisma.game.findMany({ where, orderBy, select: gameSummarySelect, ...paginate(query.page, PAGE_SIZE) }),
-      this.prisma.game.count({ where }),
+    const [list, total] = await Promise.all([
+      rows
+        .offset(paginate(query.page, PAGE_SIZE).offset)
+        .limit(PAGE_SIZE)
+        .all(),
+      db.orm.public.Game.aggregate((a) => ({ n: a.count() })),
     ]);
-    return paged(rows.map(toGameSummary), total, query.page, PAGE_SIZE);
+    return paged(list.map(toGameSummary), total.n, query.page, PAGE_SIZE);
   }
 
   async meta(): Promise<CatalogMeta> {
     const [genres, platforms] = await Promise.all([
-      this.prisma.genre.findMany({ orderBy: { name: 'asc' }, select: { id: true, slug: true, name: true } }),
-      this.prisma.platform.findMany({
-        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-        select: { id: true, slug: true, name: true, short: true },
-      }),
+      db.orm.public.Genre.select('id', 'slug', 'name').orderBy((g) => g.name.asc()).all(),
+      db.orm.public.Platform
+        .select('id', 'slug', 'name', 'short')
+        .orderBy([(p) => p.sortOrder.asc(), (p) => p.name.asc()])
+        .all(),
     ]);
     return { genres, platforms };
   }
 
   async detail(slug: string, viewerId?: string): Promise<GameDetail> {
-    const game = await this.prisma.game.findUnique({
-      where: { slug },
-      select: {
-        ...gameSummarySelect,
-        summary: true,
-        publisher: true,
-        avgHours: true,
-        backdropUrl: true,
-        source: true,
-        ratingCount: true,
-        playerCount: true,
-        likeCount: true,
-        genres: { select: { id: true, slug: true, name: true }, orderBy: { name: 'asc' } },
-        platforms: {
-          select: { id: true, slug: true, name: true, short: true },
-          orderBy: { sortOrder: 'asc' },
-        },
-        createdBy: { select: userSummarySelect },
-      },
-    });
+    const game = await db.orm.public.Game
+      .where({ slug })
+      .select(
+        'id',
+        'slug',
+        'title',
+        'releaseYear',
+        'coverUrl',
+        'developer',
+        'ratingAvg',
+        'summary',
+        'publisher',
+        'avgHours',
+        'backdropUrl',
+        'source',
+        'ratingCount',
+        'playerCount',
+        'likeCount',
+      )
+      .include('genres', (x) => x.select('id', 'slug', 'name').orderBy((y) => y.name.asc()))
+      .include('platforms', (x) => x.select('id', 'slug', 'name', 'short').orderBy((y) => y.sortOrder.asc()))
+      .include('createdBy', (u) => u.select(...userSummaryFields))
+      .first();
     if (!game) throw new NotFoundException('Jogo não encontrado');
 
-    const reviewWhere = { gameId: game.id, review: { not: null } };
+    const followerIds = viewerId
+      ? (await db.orm.public.Follow.where({ followerId: viewerId }).select('followingId').all()).map((f) => f.followingId)
+      : [];
+
     const [ratingGroups, statusGroups, hours, listCount, logCount, popular, recent, lists, viewer, friends] =
       await Promise.all([
-        this.prisma.userGame.groupBy({
-          by: ['rating'],
-          where: { gameId: game.id, rating: { not: null } },
-          _count: { _all: true },
-        }),
-        this.prisma.userGame.groupBy({
-          by: ['status'],
-          where: { gameId: game.id, status: { not: null } },
-          _count: { _all: true },
-        }),
-        this.prisma.userGame.aggregate({
-          where: { gameId: game.id, status: { in: ['COMPLETED', 'MASTERED'] }, hoursPlayed: { not: null } },
-          _avg: { hoursPlayed: true },
-        }),
-        this.prisma.listItem.count({ where: { gameId: game.id } }),
-        this.prisma.logEntry.count({ where: { gameId: game.id } }),
-        this.prisma.logEntry.findMany({
-          where: reviewWhere,
-          orderBy: [{ likes: { _count: 'desc' } }, { createdAt: 'desc' }],
-          take: 4,
-          select: logSelect(viewerId),
-        }),
-        this.prisma.logEntry.findMany({
-          where: reviewWhere,
-          orderBy: { createdAt: 'desc' },
-          take: 6,
-          select: logSelect(viewerId),
-        }),
-        this.prisma.gameList.findMany({
-          where: { items: { some: { gameId: game.id } } },
-          orderBy: { updatedAt: 'desc' },
-          take: 3,
-          select: listSummarySelect,
-        }),
+        db.orm.public.UserGame
+          .where({ gameId: game.id })
+          .where((ug) => ug.rating.isNotNull())
+          .groupBy('rating')
+          .aggregate((a) => ({ n: a.count() })),
+        db.orm.public.UserGame
+          .where({ gameId: game.id })
+          .where((ug) => ug.status.isNotNull())
+          .groupBy('status')
+          .aggregate((a) => ({ n: a.count() })),
+        db.orm.public.UserGame
+          .where({ gameId: game.id })
+          .where((ug) => ug.status.in(['COMPLETED', 'MASTERED']))
+          .where((ug) => ug.hoursPlayed.isNotNull())
+          .aggregate((a) => ({ avg: a.avg('hoursPlayed') })),
+        db.orm.public.ListItem.where({ gameId: game.id }).aggregate((a) => ({ n: a.count() })),
+        db.orm.public.LogEntry.where({ gameId: game.id }).aggregate((a) => ({ n: a.count() })),
+        logRows(viewerId)
+          .where({ gameId: game.id })
+          .where((l) => l.review.isNotNull())
+          .orderBy([(l) => l.likes.count().desc(), (l) => l.createdAt.desc()])
+          .limit(4)
+          .all(),
+        logRows(viewerId)
+          .where({ gameId: game.id })
+          .where((l) => l.review.isNotNull())
+          .orderBy((l) => l.createdAt.desc())
+          .limit(6)
+          .all(),
+        listRows()
+          .where((gl) => gl.items.some((i) => i.gameId.eq(game.id)))
+          .orderBy((gl) => gl.updatedAt.desc())
+          .limit(3)
+          .all(),
         viewerId
-          ? this.prisma.userGame.findUnique({
-              where: { userId_gameId: { userId: viewerId, gameId: game.id } },
-              select: userGameStateSelect,
-            })
-          : null,
+          ? db.orm.public.UserGame
+              .where({ userId: viewerId, gameId: game.id })
+              .select(...userGameStateFields)
+              .first()
+          : Promise.resolve(null),
         viewerId
-          ? this.prisma.userGame.findMany({
-              where: { gameId: game.id, user: { followers: { some: { followerId: viewerId } } } },
-              orderBy: { updatedAt: 'desc' },
-              take: 18,
-              select: { status: true, rating: true, liked: true, user: { select: userSummarySelect } },
-            })
-          : [],
+          ? db.orm.public.UserGame
+              .where({ gameId: game.id })
+              .where(((ug: any) => ug.user.id.in(followerIds)) as never)
+              .orderBy((ug) => ug.updatedAt.desc())
+              .limit(18)
+              .select('status', 'rating', 'liked')
+              .include('user', (u) => u.select(...userSummaryFields))
+              .all()
+          : Promise.resolve([]),
       ]);
 
     const histogram = Array.from({ length: 10 }, () => 0);
-    for (const g of ratingGroups) if (g.rating) histogram[g.rating - 1] = g._count._all;
+    for (const g of ratingGroups) if (g.rating) histogram[g.rating - 1] = g.n;
 
     const statusCounts = Object.fromEntries(PLAY_STATUSES.map((s) => [s, 0])) as Record<PlayStatus, number>;
-    for (const g of statusGroups) if (g.status) statusCounts[g.status] = g._count._all;
+    for (const g of statusGroups) if (g.status) statusCounts[g.status] = g.n;
 
     // Reviews populares e recentes podem se repetir; mostra cada uma uma vez só.
     const popularIds = new Set(popular.map((p) => p.id));
@@ -160,7 +171,7 @@ export class GamesService {
       source: game.source,
       genres: game.genres,
       platformList: game.platforms,
-      createdBy: game.createdBy,
+      createdBy: game.createdBy as GameDetail['createdBy'],
       stats: {
         ratingAvg: game.ratingAvg,
         ratingCount: game.ratingCount,
@@ -168,39 +179,37 @@ export class GamesService {
         statusCounts,
         playerCount: game.playerCount,
         likeCount: game.likeCount,
-        listCount,
-        logCount,
-        communityHours: hours._avg.hoursPlayed,
+        listCount: listCount.n,
+        logCount: logCount.n,
+        communityHours: hours.avg,
       },
       viewer: viewer ? toUserGameState(viewer) : null,
       popularReviews: popular.map(toLogView),
       recentReviews: recent.filter((r) => !popularIds.has(r.id)).map(toLogView),
       lists: lists.map(toListSummary),
-      friends,
+      friends: friends as GameDetail['friends'],
     };
   }
 
   async create(input: CreateGameInput, userId: string): Promise<GameSummary> {
     const slug = await this.uniqueSlug(input.title, input.releaseYear ?? null);
 
-    const game = await this.prisma.game.create({
-      data: {
-        slug,
-        title: input.title,
-        releaseYear: input.releaseYear ?? null,
-        developer: input.developer ?? null,
-        publisher: input.publisher ?? null,
-        summary: input.summary ?? null,
-        avgHours: input.avgHours ?? null,
-        coverUrl: input.coverUrl ?? null,
-        source: 'COMMUNITY',
-        createdById: userId,
-        genres: { connect: (input.genreIds ?? []).map((id) => ({ id })) },
-        platforms: { connect: (input.platformIds ?? []).map((id) => ({ id })) },
-      },
-      select: gameSummarySelect,
+    const created = await db.orm.public.Game.create({
+      slug,
+      title: input.title,
+      releaseYear: input.releaseYear ?? null,
+      developer: input.developer ?? null,
+      publisher: input.publisher ?? null,
+      summary: input.summary ?? null,
+      avgHours: input.avgHours ?? null,
+      coverUrl: input.coverUrl ?? null,
+      source: 'COMMUNITY',
+      createdById: userId,
+      genres: (g) => g.connect((input.genreIds ?? []).map((id) => ({ id }))),
+      platforms: (p) => p.connect((input.platformIds ?? []).map((id) => ({ id }))),
     });
-    return toGameSummary(game);
+    const game = await db.orm.public.Game.with(gameSummary).first({ id: created.id });
+    return toGameSummary(game!);
   }
 
   /** "celeste" → "celeste-2018" → "celeste-2"... até achar um slug livre. */
@@ -209,72 +218,56 @@ export class GamesService {
     const candidates = [base, ...(year ? [`${base}-${year}`] : [])];
     for (let i = 2; i < 100; i++) candidates.push(`${base}-${i}`);
     const taken = new Set(
-      (await this.prisma.game.findMany({ where: { slug: { in: candidates } }, select: { slug: true } })).map((g) => g.slug),
+      (await db.orm.public.Game.where((g) => g.slug.in(candidates)).select('slug').all()).map((g) => g.slug),
     );
     return candidates.find((c) => !taken.has(c)) ?? `${base}-${Date.now()}`;
   }
 
   async remove(slug: string, userId: string) {
-    const game = await this.prisma.game.findUnique({ where: { slug }, select: { id: true, createdById: true, playerCount: true } });
+    const game = await db.orm.public.Game.where({ slug }).select('id', 'createdById', 'playerCount').first();
     if (!game) throw new NotFoundException('Jogo não encontrado');
     if (game.createdById !== userId) throw new ForbiddenException('Só quem cadastrou pode remover');
     if (game.playerCount > 1) throw new ForbiddenException('Outras pessoas já registraram este jogo');
-    await this.prisma.game.delete({ where: { id: game.id } });
+    await db.orm.public.Game.where({ id: game.id }).delete();
   }
 
   async home(viewerId?: string): Promise<HomeData> {
-    const since = new Date(Date.now() - 1000 * 60 * 60 * 24 * 21);
+    const sinceDate = new Date(Date.now() - 1000 * 60 * 60 * 24 * 21);
+    const sinceDay = sinceDate.toISOString().slice(0, 10);
+    const followerIds = viewerId
+      ? (await db.orm.public.Follow.where({ followerId: viewerId }).select('followingId').all()).map((f) => f.followingId)
+      : [];
 
-    const [trendingGroups, recentReviews, popularReviews, lists, friends, games, users, logs] = await Promise.all([
-      this.prisma.logEntry.groupBy({
-        by: ['gameId'],
-        where: { playedOn: { gte: since } },
-        _count: { gameId: true },
-        orderBy: { _count: { gameId: 'desc' } },
-        take: 12,
-      }),
-      this.prisma.logEntry.findMany({
-        where: { review: { not: null }, spoiler: false },
-        orderBy: { createdAt: 'desc' },
-        take: 6,
-        select: logSelect(viewerId),
-      }),
-      this.prisma.logEntry.findMany({
-        where: { review: { not: null }, createdAt: { gte: since } },
-        orderBy: [{ likes: { _count: 'desc' } }, { createdAt: 'desc' }],
-        take: 6,
-        select: logSelect(viewerId),
-      }),
-      this.prisma.gameList.findMany({
-        orderBy: [{ items: { _count: 'desc' } }, { updatedAt: 'desc' }],
-        take: 4,
-        select: listSummarySelect,
-      }),
+    const [trending, recentReviews, popularReviews, lists, friends, games, users, logs] = await Promise.all([
+      db.orm.public.Game
+        .with(gameSummary)
+        .orderBy((g) => g.logs.count((l) => l.playedOn.gte(sinceDay)).desc())
+        .limit(12)
+        .all(),
+      logRows(viewerId)
+        .where({ spoiler: false })
+        .where((l) => l.review.isNotNull())
+        .orderBy((l) => l.createdAt.desc())
+        .limit(6)
+        .all(),
+      logRows(viewerId)
+        .where((l) => l.review.isNotNull())
+        .where((l) => l.createdAt.gte(sinceDate))
+        .orderBy([(l) => l.likes.count().desc(), (l) => l.createdAt.desc()])
+        .limit(6)
+        .all(),
+      listRows().orderBy((gl) => gl.updatedAt.desc()).limit(4).all(),
       viewerId
-        ? this.prisma.logEntry.findMany({
-            where: { user: { followers: { some: { followerId: viewerId } } } },
-            orderBy: [{ playedOn: 'desc' }, { createdAt: 'desc' }],
-            take: 30, // o front remove jogos repetidos e mostra 6
-            select: logSelect(viewerId),
-          })
-        : [],
-      this.prisma.game.count(),
-      this.prisma.user.count(),
-      this.prisma.logEntry.count(),
+        ? logRows(viewerId)
+            .where(((l: any) => l.user.id.in(followerIds)) as never)
+            .orderBy([(l) => l.playedOn.desc(), (l) => l.createdAt.desc()])
+            .limit(30) // o front remove jogos repetidos e mostra 6
+            .all()
+        : Promise.resolve([]),
+      db.orm.public.Game.aggregate((a) => ({ n: a.count() })),
+      db.orm.public.User.aggregate((a) => ({ n: a.count() })),
+      db.orm.public.LogEntry.aggregate((a) => ({ n: a.count() })),
     ]);
-
-    const ids = trendingGroups.map((g) => g.gameId);
-    const trendingRows = await this.prisma.game.findMany({ where: { id: { in: ids } }, select: gameSummarySelect });
-    let trending = ids.map((id) => trendingRows.find((g) => g.id === id)!).filter(Boolean);
-    if (trending.length < 12) {
-      const filler = await this.prisma.game.findMany({
-        where: { id: { notIn: ids } },
-        orderBy: { playerCount: 'desc' },
-        take: 12 - trending.length,
-        select: gameSummarySelect,
-      });
-      trending = [...trending, ...filler];
-    }
 
     const popularIds = new Set(popularReviews.map((r) => r.id));
     return {
@@ -283,17 +276,17 @@ export class GamesService {
       recentReviews: recentReviews.filter((r) => !popularIds.has(r.id)).map(toLogView),
       lists: lists.map(toListSummary),
       friends: friends.map(toLogView),
-      totals: { games, users, logs },
+      totals: { games: games.n, users: users.n, logs: logs.n },
     };
   }
 
   async searchLite(q: string): Promise<GameSummary[]> {
-    const rows = await this.prisma.game.findMany({
-      where: { title: { contains: q, mode: 'insensitive' } },
-      orderBy: [{ playerCount: 'desc' }, { title: 'asc' }],
-      take: 10,
-      select: gameSummarySelect,
-    });
+    const rows = await db.orm.public.Game
+      .with(gameSummary)
+      .where((g) => g.title.ilike(`%${q}%`))
+      .orderBy([(g) => g.playerCount.desc(), (g) => g.title.asc()])
+      .limit(10)
+      .all();
     return rows.map(toGameSummary);
   }
 }

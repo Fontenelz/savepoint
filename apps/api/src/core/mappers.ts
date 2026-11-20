@@ -1,30 +1,24 @@
-import { Prisma } from '@prisma/client';
+import type { CollectionRowOf } from '@prisma/orm-postgres/orm-client';
 import type { GameSummary, ListSummary, LogView, UserGameState } from '@savepoint/shared';
+import type { Contract } from '../prisma/contract.js';
+import { db } from './runtime';
 
-/** Selects e conversores reutilizados por vários módulos (Prisma → contrato da API). */
+/** Ramos de consulta e conversores reutilizados por vários módulos (ORM 8 → contrato da API). */
 
-export const userSummarySelect = {
-  id: true,
-  username: true,
-  displayName: true,
-  avatarHue: true,
-} satisfies Prisma.UserSelect;
+/** Resumo de usuário: o mesmo conjunto de campos que o antigo `userSummarySelect`. */
+export const userSummaryFields = ['id', 'username', 'displayName', 'avatarHue'] as const;
 
-export const gameSummarySelect = {
-  id: true,
-  slug: true,
-  title: true,
-  releaseYear: true,
-  coverUrl: true,
-  developer: true,
-  ratingAvg: true,
-  platforms: { select: { short: true }, orderBy: { sortOrder: 'asc' } },
-  genres: { select: { name: true }, orderBy: { name: 'asc' }, take: 1 },
-} satisfies Prisma.GameSelect;
+/** Resumo de jogo: campos + plataformas ordenadas + 1º gênero (antigo `gameSummarySelect`). */
+export const gameSummary = db.orm.public.Game.fragment((g) =>
+  g
+    .select('id', 'slug', 'title', 'releaseYear', 'coverUrl', 'developer', 'ratingAvg')
+    .include('platforms', (p) => p.select('short').orderBy((x) => x.sortOrder.asc()))
+    .include('genres', (x) => x.select('name').orderBy((y) => y.name.asc()).limit(1)),
+);
 
-type GameSummaryRow = Prisma.GameGetPayload<{ select: typeof gameSummarySelect }>;
+export type GameRow = CollectionRowOf<ReturnType<typeof gameSummary>>;
 
-export function toGameSummary(g: GameSummaryRow): GameSummary {
+export function toGameSummary(g: GameRow): GameSummary {
   return {
     id: g.id,
     slug: g.slug,
@@ -38,32 +32,29 @@ export function toGameSummary(g: GameSummaryRow): GameSummary {
   };
 }
 
-export function logSelect(viewerId?: string) {
-  return {
-    id: true,
-    playedOn: true,
-    rating: true,
-    liked: true,
-    review: true,
-    spoiler: true,
-    finished: true,
-    replay: true,
-    hours: true,
-    createdAt: true,
-    platform: { select: { short: true } },
-    user: { select: userSummarySelect },
-    game: { select: gameSummarySelect },
-    _count: { select: { likes: true, comments: true } },
-    likes: { where: { userId: viewerId ?? '__anon__' }, select: { userId: true }, take: 1 },
-  } satisfies Prisma.LogEntrySelect;
+/**
+ * Linha de diário completa: plataforma, autor, jogo, contagens de likes/comentários
+ * e a curtida de quem vê (antigo `logSelect(viewerId)`).
+ */
+export function logRows(viewerId?: string) {
+  return db.orm.public.LogEntry.include('platform', (p) => p.select('short'))
+    .include('user', (u) => u.select('id', 'username', 'displayName', 'avatarHue'))
+    .include("game", (g) => g.with(gameSummary) as never)
+    .include('likes', (likes) =>
+      likes.combine({
+        viewer: likes.where((l) => l.userId.eq(viewerId ?? '__anon__')).limit(1),
+        total: likes.count(),
+      }),
+    )
+    .include('comments', (comments) => comments.count());
 }
 
-type LogRow = Prisma.LogEntryGetPayload<{ select: ReturnType<typeof logSelect> }>;
+export type LogRow = CollectionRowOf<ReturnType<typeof logRows>>;
 
 export function toLogView(l: LogRow): LogView {
   return {
     id: l.id,
-    playedOn: toDateString(l.playedOn)!,
+    playedOn: l.playedOn,
     rating: l.rating,
     liked: l.liked,
     review: l.review,
@@ -73,30 +64,26 @@ export function toLogView(l: LogRow): LogView {
     hours: l.hours,
     platform: l.platform?.short ?? null,
     createdAt: l.createdAt.toISOString(),
-    user: l.user,
-    game: toGameSummary(l.game),
-    likeCount: l._count.likes,
-    commentCount: l._count.comments,
-    viewerLiked: l.likes.length > 0,
+    user: l.user!,
+    game: toGameSummary(l.game!),
+    likeCount: l.likes.total,
+    commentCount: l.comments,
+    viewerLiked: l.likes.viewer.length > 0,
   };
 }
 
-export const listSummarySelect = {
-  id: true,
-  title: true,
-  description: true,
-  ranked: true,
-  updatedAt: true,
-  user: { select: userSummarySelect },
-  _count: { select: { items: true } },
-  items: {
-    orderBy: { position: 'asc' },
-    take: 5,
-    select: { game: { select: gameSummarySelect } },
-  },
-} satisfies Prisma.GameListSelect;
+/** Resumo de lista: autor, nº de itens e os 5 primeiros jogos (antigo `listSummarySelect`). */
+export function listRows() {
+  return db.orm.public.GameList.include('user', (u) => u.select('id', 'username', 'displayName', 'avatarHue'))
+    .include('items', (items) =>
+      items.combine({
+        count: items.count(),
+        preview: items.orderBy((i) => i.position.asc()).limit(5).include("game", (g) => g.with(gameSummary) as never),
+      }),
+    );
+}
 
-type ListRow = Prisma.GameListGetPayload<{ select: typeof listSummarySelect }>;
+export type ListRow = CollectionRowOf<ReturnType<typeof listRows>>;
 
 export function toListSummary(l: ListRow): ListSummary {
   return {
@@ -105,45 +92,45 @@ export function toListSummary(l: ListRow): ListSummary {
     description: l.description,
     ranked: l.ranked,
     updatedAt: l.updatedAt.toISOString(),
-    user: l.user,
-    itemCount: l._count.items,
-    preview: l.items.map((i) => toGameSummary(i.game)),
+    user: l.user!,
+    itemCount: l.items.count,
+    preview: l.items.preview.map((i) => toGameSummary(i.game!)),
   };
 }
 
-export const userGameStateSelect = {
-  status: true,
-  rating: true,
-  liked: true,
-  favoriteRank: true,
-  platformId: true,
-  hoursPlayed: true,
-  startedAt: true,
-  finishedAt: true,
-} satisfies Prisma.UserGameSelect;
+/** Estado do jogo para quem vê (antigo `userGameStateSelect`): só campos escalares. */
+export const userGameStateFields = [
+  'status',
+  'rating',
+  'liked',
+  'favoriteRank',
+  'platformId',
+  'hoursPlayed',
+  'startedAt',
+  'finishedAt',
+] as const;
 
-type StateRow = Prisma.UserGameGetPayload<{ select: typeof userGameStateSelect }>;
+function stateRows() {
+  return db.orm.public.UserGame.select(...userGameStateFields);
+}
+
+export type StateRow = CollectionRowOf<ReturnType<typeof stateRows>>;
 
 export function toUserGameState(s: StateRow): UserGameState {
   return {
-    ...s,
-    startedAt: toDateString(s.startedAt),
-    finishedAt: toDateString(s.finishedAt),
+    status: s.status,
+    rating: s.rating,
+    liked: s.liked,
+    favoriteRank: s.favoriteRank,
+    platformId: s.platformId,
+    hoursPlayed: s.hoursPlayed,
+    startedAt: s.startedAt,
+    finishedAt: s.finishedAt,
   };
 }
 
-export function toDateString(d: Date | null): string | null {
-  return d ? d.toISOString().slice(0, 10) : null;
-}
-
-export function fromDateString(s: string | null | undefined): Date | null | undefined {
-  if (s === undefined) return undefined;
-  if (s === null) return null;
-  return new Date(`${s}T00:00:00.000Z`);
-}
-
 export function paginate(page: number, pageSize: number) {
-  return { skip: (page - 1) * pageSize, take: pageSize };
+  return { offset: (page - 1) * pageSize, limit: pageSize };
 }
 
 export function paged<T>(items: T[], total: number, page: number, pageSize: number) {
