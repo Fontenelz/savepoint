@@ -5,7 +5,7 @@ import { MediaService } from '../core/media.service';
 import { PrismaService } from '../core/prisma.service';
 import { GamesService } from '../games/games.service';
 import { ARTWORK_SOURCES, type ArtworkSource } from './providers/artwork-source';
-import { CATALOG_PROVIDERS, type CatalogProvider, type ExternalGame } from './providers/catalog-provider';
+import { CATALOG_PROVIDERS, matchScore, type CatalogProvider, type ExternalGame } from './providers/catalog-provider';
 
 export interface EnrichResult {
   slug: string;
@@ -72,6 +72,26 @@ export class CatalogService {
 
     const ext = await provider.fetch(externalId);
     if (!ext) throw new NotFoundException('Jogo não encontrado na fonte externa');
+    const { slug } = await this.importExternal(ext, userId);
+    return { slug };
+  }
+
+  /**
+   * Salva um jogo externo já obtido no banco local e baixa as imagens para o nosso armazenamento.
+   * Idempotente: se o jogo já existe (pelo id externo ou mesmo título + ano), só vincula o id.
+   */
+  async importExternal(
+    ext: ExternalGame,
+    userId: string | null,
+  ): Promise<{ slug: string; status: 'created' | 'linked' | 'exists' }> {
+    const existing = await this.prisma.game.findUnique({ where: { igdbId: ext.externalId }, select: { slug: true } });
+    if (existing) return { slug: existing.slug, status: 'exists' };
+
+    const local = await this.findLocalMatch(ext);
+    if (local) {
+      await this.prisma.game.update({ where: { id: local.id }, data: { igdbId: ext.externalId } });
+      return { slug: local.slug, status: 'linked' };
+    }
 
     const [genreIds, platformIds] = await Promise.all([this.upsertGenres(ext), this.upsertPlatforms(ext)]);
     const slug = await this.games.uniqueSlug(ext.title, ext.releaseYear);
@@ -97,7 +117,18 @@ export class CatalogService {
     });
     // Baixa as imagens para o armazenamento local (não depender do CDN externo).
     await this.enrichGame(slug).catch(() => undefined);
-    return { slug };
+    return { slug, status: 'created' };
+  }
+
+  /** Jogo local sem id do IGDB com o mesmo título e ano (ex.: os jogos curados do seed). */
+  private async findLocalMatch(ext: ExternalGame) {
+    const candidates = await this.prisma.game.findMany({
+      where: { igdbId: null },
+      select: { id: true, slug: true, title: true, releaseYear: true },
+    });
+    return (
+      candidates.find((g) => matchScore({ title: g.title, year: g.releaseYear }, ext) >= 130) ?? null
+    );
   }
 
   /**

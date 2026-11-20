@@ -63,6 +63,18 @@ export class IgdbProvider implements CatalogProvider, ArtworkSource {
     return rows.map((r) => this.map(r));
   }
 
+  /**
+   * Jogos mais populares (por número de avaliações), só jogos "principais":
+   * sem versões/edições (version_parent) e sem DLCs/expansões (parent_game).
+   */
+  async popular(limit: number, offset = 0): Promise<ExternalGame[]> {
+    const rows = await this.request(
+      `${FIELDS} where version_parent = null & parent_game = null & cover != null & total_rating_count > 0; ` +
+        `sort total_rating_count desc; limit ${Math.min(limit, 500)}; offset ${offset};`,
+    );
+    return rows.map((r) => this.map(r));
+  }
+
   async fetch(externalId: string): Promise<ExternalGame | null> {
     if (!/^\d+$/.test(externalId)) return null;
     const rows = await this.request(`${FIELDS} where id = ${externalId};`);

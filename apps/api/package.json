@@ -11,7 +11,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed && nest build && node dist/catalog/sync.cli.js --optional",
     "db:reset": "prisma migrate reset --force --skip-seed && pnpm db:seed",
-    "catalog:sync": "nest build && node dist/catalog/sync.cli.js"
+    "catalog:sync": "nest build && node dist/catalog/sync.cli.js",
+    "catalog:import": "nest build && node dist/catalog/import.cli.js"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
