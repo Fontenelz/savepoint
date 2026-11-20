@@ -28,6 +28,16 @@ const FIELDS =
 const image = (size: string, img?: IgdbImage) =>
   img ? `https://images.igdb.com/igdb/image/upload/${size}/${img.image_id}.jpg` : null;
 
+/** `external_game_sources`: 1 = Steam. */
+const STEAM_SOURCE = 1;
+
+export interface IgdbDetails {
+  slug: string;
+  steamAppId: string | null;
+  /** Tempo para zerar, em horas. */
+  hours: number | null;
+}
+
 /** O IGDB limita a ~4 requisições/segundo por cliente. */
 const MIN_INTERVAL_MS = 300;
 
@@ -73,6 +83,45 @@ export class IgdbProvider implements CatalogProvider, ArtworkSource {
         `sort total_rating_count desc; limit ${Math.min(limit, 500)}; offset ${offset};`,
     );
     return rows.map((r) => this.map(r));
+  }
+
+  /**
+   * Dados complementares de vários jogos de uma vez (lotes de 500):
+   * slug do IGDB, app id da Steam e tempo médio para zerar (horas).
+   */
+  async details(ids: string[]): Promise<Map<string, IgdbDetails>> {
+    const out = new Map<string, IgdbDetails>();
+    const valid = ids.filter((id) => /^\d+$/.test(id));
+    for (let i = 0; i < valid.length; i += 500) {
+      const list = valid.slice(i, i + 500).join(',');
+      const [games, steam, times] = [
+        await this.request<{ id: number; slug: string }>(`fields slug; where id = (${list}); limit 500;`),
+        await this.request<{ game: number; uid: string }>(
+          `fields game,uid; where game = (${list}) & external_game_source = ${STEAM_SOURCE}; limit 500;`,
+          'external_games',
+        ),
+        await this.request<{ game_id: number; hastily?: number; normally?: number }>(
+          `fields game_id,hastily,normally; where game_id = (${list}); limit 500;`,
+          'game_time_to_beats',
+        ),
+      ];
+      for (const g of games) out.set(String(g.id), { slug: g.slug, steamAppId: null, hours: null });
+      for (const s of steam) {
+        const d = out.get(String(s.game));
+        if (d && !d.steamAppId && /^\d+$/.test(s.uid)) d.steamAppId = s.uid;
+      }
+      for (const t of times) {
+        const d = out.get(String(t.game_id));
+        // "Rápido" ≈ só a história; "normal" já inclui muito conteúdo extra. A média geométrica dos
+        // dois fica perto dos tempos do catálogo curado (ex.: Witcher 3: 37h e 71h → 51,5h; curado: 52h).
+        // Dados contraditórios (rápido > normal, ex.: Vice City com 876h × 134h) são descartados.
+        if (t.hastily && t.normally && t.hastily > t.normally) continue;
+        const seconds = t.hastily && t.normally ? Math.sqrt(t.hastily * t.normally) : t.hastily || t.normally;
+        // Arredonda para meia hora (mesma granularidade do catálogo curado).
+        if (d && seconds) d.hours = Math.max(0.5, Math.round((seconds / 3600) * 2) / 2);
+      }
+    }
+    return out;
   }
 
   async fetch(externalId: string): Promise<ExternalGame | null> {
@@ -124,14 +173,14 @@ export class IgdbProvider implements CatalogProvider, ArtworkSource {
     };
   }
 
-  private async request(body: string, attempt = 0): Promise<IgdbGame[]> {
+  private async request<T = IgdbGame>(body: string, endpoint = 'games', attempt = 0): Promise<T[]> {
     if (!this.isEnabled()) throw new ServiceUnavailableException('IGDB não configurado');
     const wait = this.lastRequest + MIN_INTERVAL_MS - Date.now();
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     this.lastRequest = Date.now();
 
     const token = await this.getToken();
-    const res = await fetch('https://api.igdb.com/v4/games', {
+    const res = await fetch(`https://api.igdb.com/v4/${endpoint}`, {
       method: 'POST',
       headers: { 'Client-ID': this.clientId, Authorization: `Bearer ${token}`, 'Content-Type': 'text/plain' },
       body,
@@ -139,17 +188,17 @@ export class IgdbProvider implements CatalogProvider, ArtworkSource {
 
     if (res.status === 429 && attempt < 3) {
       await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
-      return this.request(body, attempt + 1);
+      return this.request<T>(body, endpoint, attempt + 1);
     }
     if (res.status === 401 && attempt < 1) {
       this.token = null; // token expirou: renova e tenta de novo
-      return this.request(body, attempt + 1);
+      return this.request<T>(body, endpoint, attempt + 1);
     }
     if (!res.ok) {
       this.logger.warn(`IGDB respondeu ${res.status}: ${await res.text().catch(() => '')}`);
       throw new ServiceUnavailableException('O IGDB não respondeu. Tente novamente mais tarde.');
     }
-    return (await res.json()) as IgdbGame[];
+    return (await res.json()) as T[];
   }
 
   private async getToken(): Promise<string> {

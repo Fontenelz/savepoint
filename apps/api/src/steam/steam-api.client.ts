@@ -6,7 +6,6 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { HttpCacheService } from '../core/http-cache.service';
 import { USER_AGENT } from '../core/media.service';
 
 export const STEAM_OPENID_ENDPOINT = 'https://steamcommunity.com/openid/login';
@@ -31,21 +30,10 @@ export interface SteamPlayer {
   profileUrl: string;
 }
 
-export interface SteamAppDetails {
-  type: string;
-  name: string;
-  short_description?: string;
-  developers?: string[];
-  publishers?: string[];
-  release_date?: { coming_soon: boolean; date: string };
-  genres?: { id: string; description: string }[];
-}
-
 /**
  * Cliente das APIs da Steam:
  * - OpenID 2.0 (login na Steam → SteamID), sem chave;
- * - Steam Web API (perfil e biblioteca), com STEAM_API_KEY;
- * - API da loja (dados do jogo, em português), sem chave e com cache.
+ * - Steam Web API (perfil e biblioteca), com STEAM_API_KEY.
  */
 @Injectable()
 export class SteamApiClient {
@@ -55,7 +43,6 @@ export class SteamApiClient {
 
   constructor(
     private readonly config: ConfigService,
-    private readonly cache: HttpCacheService,
   ) {}
 
   private get key() {
@@ -116,27 +103,6 @@ export class SteamApiClient {
     const value = { private: data.response.game_count === undefined, games: data.response.games ?? [] };
     this.ownedCache.set(steamId, { at: Date.now(), value });
     return value;
-  }
-
-  /** Dados públicos da loja, em português. Respostas ficam em cache por 30 dias. */
-  async appDetails(appId: string): Promise<SteamAppDetails | null> {
-    const url = `https://store.steampowered.com/api/appdetails?appids=${appId}&l=brazilian&cc=br`;
-    type Payload = Record<string, { success: boolean; data?: SteamAppDetails }>;
-    let payload = await this.cache.get<Payload>(url);
-    if (!payload) {
-      let res: Response;
-      try {
-        res = await fetch(url, { headers: { 'user-agent': USER_AGENT }, signal: AbortSignal.timeout(10_000) });
-      } catch {
-        throw new ServiceUnavailableException('A loja da Steam não respondeu.');
-      }
-      if (res.status === 429) throw new ServiceUnavailableException('Limite de consultas da loja da Steam. Tente em alguns minutos.');
-      if (!res.ok) throw new ServiceUnavailableException(`A loja da Steam respondeu ${res.status}.`);
-      payload = (await res.json()) as Payload;
-      if (payload?.[appId]?.success) await this.cache.set(url, payload).catch(() => undefined);
-    }
-    const entry = payload?.[appId];
-    return entry?.success && entry.data ? entry.data : null;
   }
 
   private async webApi<T>(path: string, query: Record<string, string>): Promise<T> {

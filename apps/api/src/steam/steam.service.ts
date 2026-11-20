@@ -9,13 +9,14 @@ import type {
   SteamLibraryItem,
 } from '@savepoint/shared';
 import { CatalogService } from '../catalog/catalog.service';
+import { SteamStoreClient, plainText, type SteamAppDetails } from '../catalog/providers/steam-store.client';
 import { STEAM_HOSTS } from '../catalog/providers/wiki-steam.source';
 import { gameSummarySelect, toGameSummary } from '../core/mappers';
 import { MediaService } from '../core/media.service';
 import { PrismaService } from '../core/prisma.service';
 import { StatsService } from '../core/stats.service';
 import { GamesService } from '../games/games.service';
-import { SteamApiClient, type SteamAppDetails, type SteamOwnedGame } from './steam-api.client';
+import { SteamApiClient, type SteamOwnedGame } from './steam-api.client';
 
 const accountSelect = {
   steamId: true,
@@ -30,28 +31,13 @@ const NOT_A_GAME = /\b(test server|public test|dedicated server|sdk|benchmark|so
 
 const toHours = (minutes: number) => (minutes > 0 ? Math.round(minutes / 6) / 10 : null);
 
-/** "Coisas &amp; <b>tal</b>" → "Coisas & tal" (a descrição curta da loja vem com HTML). */
-function plainText(html: string | undefined) {
-  if (!html) return null;
-  const text = html
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/&quot;/g, '"')
-    .replace(/&#0?39;|&apos;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return text ? text.slice(0, 2000) : null;
-}
-
 @Injectable()
 export class SteamService {
   private readonly logger = new Logger(SteamService.name);
 
   constructor(
     private readonly steam: SteamApiClient,
+    private readonly store: SteamStoreClient,
     private readonly prisma: PrismaService,
     private readonly stats: StatsService,
     private readonly media: MediaService,
@@ -205,7 +191,7 @@ export class SteamService {
     appId: string,
     ownedName: string | null,
   ): Promise<{ id: string; isNew: boolean } | { skip: string }> {
-    const store = await this.steam.appDetails(appId);
+    const store = await this.store.appDetails(appId);
     let d: SteamAppDetails;
     if (store) {
       if (store.type !== 'game') return { skip: 'Não é um jogo (DLC, trilha sonora, ferramenta ou vídeo).' };

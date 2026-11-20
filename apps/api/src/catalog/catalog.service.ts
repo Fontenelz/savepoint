@@ -4,6 +4,7 @@ import { slugify, type CatalogStatus, type ExternalGameResult } from '@savepoint
 import { MediaService } from '../core/media.service';
 import { PrismaService } from '../core/prisma.service';
 import { GamesService } from '../games/games.service';
+import { CatalogDetailsService } from './details.service';
 import { ARTWORK_SOURCES, type ArtworkSource } from './providers/artwork-source';
 import { CATALOG_PROVIDERS, matchScore, type CatalogProvider, type ExternalGame } from './providers/catalog-provider';
 
@@ -32,6 +33,7 @@ export class CatalogService {
     private readonly prisma: PrismaService,
     private readonly games: GamesService,
     private readonly media: MediaService,
+    private readonly details: CatalogDetailsService,
   ) {}
 
   status(): CatalogStatus {
@@ -96,7 +98,8 @@ export class CatalogService {
     const [genreIds, platformIds] = await Promise.all([this.upsertGenres(ext), this.upsertPlatforms(ext)]);
     const slug = await this.games.uniqueSlug(ext.title, ext.releaseYear);
 
-    await this.prisma.game.create({
+    const created = await this.prisma.game.create({
+      select: { id: true },
       data: {
         slug,
         title: ext.title,
@@ -117,6 +120,8 @@ export class CatalogService {
     });
     // Baixa as imagens para o armazenamento local (não depender do CDN externo).
     await this.enrichGame(slug).catch(() => undefined);
+    // Sinopse em português, app id da Steam e tempo médio (opcional: nunca impede a importação).
+    await this.details.enrich({ gameIds: [created.id] }).catch(() => undefined);
     return { slug, status: 'created' };
   }
 
