@@ -183,7 +183,7 @@ export class UsersService {
     return paged(
       rows.map(({ game, updatedAt, ...state }) => ({
         game: toGameSummary(game),
-        state: toUserGameState(state),
+        state: toUserGameState({ ...state, game }),
         updatedAt: updatedAt.toISOString(),
       })),
       total,
@@ -206,7 +206,7 @@ export class UsersService {
     ]);
     const toItem = ({ game, updatedAt, ...state }: (typeof playing)[number]): QueueItem => ({
       game: { ...toGameSummary(game), avgHours: game.avgHours },
-      state: toUserGameState(state),
+      state: toUserGameState({ ...state, game }),
       updatedAt: updatedAt.toISOString(),
     });
     return { playing: playing.map(toItem), backlog: backlog.map(toItem) };

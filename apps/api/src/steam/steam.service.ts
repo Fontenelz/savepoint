@@ -141,16 +141,20 @@ export class SteamService {
         continue;
       }
       try {
-        let game = await this.prisma.game.findFirst({ where: { steamAppId: item.appId }, select: { id: true } });
+        let game = await this.prisma.game.findFirst({
+          where: { steamAppId: item.appId },
+          select: { id: true, steamScore: true },
+        });
         if (!game) {
           const created = await this.createFromStore(item.appId, o.name ?? null);
           if ('skip' in created) {
             result.skipped.push({ appId: item.appId, reason: created.skip });
             continue;
           }
-          game = created;
+          game = { id: created.id, steamScore: null };
           if (created.isNew) result.createdGames++;
         }
+        if (game.steamScore == null) await this.fillSteamScore(game.id, item.appId);
 
         const hours = toHours(o.playtime_forever);
         const entry = await this.prisma.userGame.findUnique({
@@ -181,6 +185,21 @@ export class SteamService {
     for (const id of touched) await this.stats.refreshGame(id);
     await this.prisma.user.update({ where: { id: userId }, data: { steamSyncedAt: new Date() } });
     return result;
+  }
+
+  /** Guarda as avaliações da loja (base da nota sugerida). Falhar aqui não impede a importação. */
+  private async fillSteamScore(gameId: string, appId: string) {
+    try {
+      const summary = await this.store.reviewSummary(appId);
+      if (summary) {
+        await this.prisma.game.update({
+          where: { id: gameId },
+          data: { steamScore: summary.score, steamReviewCount: summary.total },
+        });
+      }
+    } catch (e) {
+      this.logger.warn(`Avaliações Steam ${appId}: ${e instanceof Error ? e.message : e}`);
+    }
   }
 
   /**

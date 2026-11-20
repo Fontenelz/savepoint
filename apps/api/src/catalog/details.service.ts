@@ -136,6 +136,39 @@ export class CatalogDetailsService {
   }
 
   /**
+   * Avaliações da loja da Steam (% positivas e total) de todo jogo com app id: base da nota
+   * sugerida aos jogadores. Só os que ainda não têm, ou todos com `refresh`.
+   */
+  async fillSteamScores(
+    opts: { refresh?: boolean; onProgress?: (title: string, score: number | null, i: number, total: number) => void } = {},
+  ): Promise<{ filled: number; total: number }> {
+    const games = await this.prisma.game.findMany({
+      where: { steamAppId: { not: null }, ...(opts.refresh ? {} : { steamScore: null }) },
+      orderBy: { title: 'asc' },
+      select: { id: true, title: true, steamAppId: true },
+    });
+    let filled = 0;
+    for (const [i, g] of games.entries()) {
+      let score: number | null = null;
+      try {
+        const summary = await this.store.reviewSummary(g.steamAppId!);
+        if (summary) {
+          await this.prisma.game.update({
+            where: { id: g.id },
+            data: { steamScore: summary.score, steamReviewCount: summary.total },
+          });
+          score = summary.score;
+          filled++;
+        }
+      } catch (e) {
+        this.logger.warn(`Avaliações Steam de ${g.title}: ${e instanceof Error ? e.message : e}`);
+      }
+      opts.onProgress?.(g.title, score, i, games.length);
+    }
+    return { filled, total: games.length };
+  }
+
+  /**
    * Junta gêneros duplicados criados por importações antigas (ex.: "Adventure" → "Aventura")
    * e remove categorias que não são gênero ("Gratuitos para Jogar", "Acesso Antecipado").
    */

@@ -62,7 +62,14 @@ export default async function LibraryPage({
         <div className="grid-posters">
           {data.items.map(({ game, state }) => (
             <Poster key={game.id} game={game} status={state.status}>
-              <Stars rating={state.rating} />
+              {state.rating ? (
+                <Stars rating={state.rating} />
+              ) : profile.isMe && state.suggested ? (
+                // Só o dono vê a sugestão: para visitantes pareceria a nota dele.
+                <span className="stars-suggested" title={`Nota sugerida pela Steam (${state.suggested.steamScore}% positivas)`}>
+                  <Stars rating={state.suggested.rating} />
+                </span>
+              ) : null}
               <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                 {state.liked && <Icon name="heart" size={11} fill className="heart" />}
                 {state.hoursPlayed != null && <span className="mono">{Math.round(state.hoursPlayed)}h</span>}
