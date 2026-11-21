@@ -38,7 +38,14 @@ export async function api<T>(path: string, init: ApiInit = {}): Promise<T> {
   }
 
   const text = await res.text();
-  const data = text ? JSON.parse(text) : undefined;
+  let data: { message?: unknown } | undefined;
+  try {
+    data = text ? JSON.parse(text) : undefined;
+  } catch {
+    // Corpo que não é JSON (ex.: página de erro/timeout da Vercel): vira ApiError em vez de quebrar a página.
+    console.error(`API ${path}: resposta ${res.status} não é JSON: ${text.slice(0, 200)}`);
+    throw new ApiError(res.ok ? 502 : res.status, 'A API não respondeu como esperado. Tente de novo em instantes.');
+  }
   if (!res.ok) {
     const message = typeof data?.message === 'string' ? data.message : `Erro ${res.status}`;
     throw new ApiError(res.status, message);

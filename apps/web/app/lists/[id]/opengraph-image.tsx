@@ -41,7 +41,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
         {covers.length > 0 && (
           <div style={{ display: 'flex', gap: 16, marginTop: 14 }}>
             {covers.map((src, i) => (
-              <Cover key={i} src={src} width={150} />
+              <Cover key={i} src={src} width={120} />
             ))}
           </div>
         )}

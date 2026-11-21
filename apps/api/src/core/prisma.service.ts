@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 
 /**
@@ -20,15 +20,16 @@ function runtimeUrl(): string | undefined {
   return url.toString();
 }
 
+/**
+ * Sem `$connect()` na inicialização: o Prisma conecta sozinho na primeira consulta e tenta de novo
+ * nas seguintes se falhar. Assim, uma falha momentânea do banco derruba só aquela requisição
+ * (503, ver DatabaseUnavailableFilter) em vez da subida inteira da instância.
+ */
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService extends PrismaClient implements OnModuleDestroy {
   constructor() {
     const url = runtimeUrl();
     super(url ? { datasourceUrl: url } : undefined);
-  }
-
-  async onModuleInit() {
-    await this.$connect();
   }
 
   async onModuleDestroy() {
