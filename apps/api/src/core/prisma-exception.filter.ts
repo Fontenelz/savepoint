@@ -24,6 +24,8 @@ export class PrismaExceptionFilter implements ExceptionFilter {
       P1002: unavailable,
       P1017: unavailable,
       P2024: unavailable,
+      // Consulta sem resposta (query_timeout do pg, ver PrismaService): chega com o código do socket.
+      ETIMEDOUT: unavailable,
     };
     const [status, message] = map[error.code] ?? [HttpStatus.INTERNAL_SERVER_ERROR, 'Erro interno'];
     if (status >= 500) this.logger.error(error);
