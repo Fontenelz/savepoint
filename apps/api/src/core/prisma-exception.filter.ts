@@ -21,3 +21,21 @@ export class PrismaExceptionFilter implements ExceptionFilter {
     reply.status(status).send({ statusCode: status, message });
   }
 }
+
+/**
+ * Banco inacessível (ex.: "Can't reach database server" ao conectar no pooler):
+ * responde 503 em JSON, para o site mostrar uma mensagem clara em vez de "Erro interno".
+ */
+@Catch(Prisma.PrismaClientInitializationError)
+export class DatabaseUnavailableFilter implements ExceptionFilter {
+  private readonly logger = new Logger(DatabaseUnavailableFilter.name);
+
+  catch(error: Prisma.PrismaClientInitializationError, host: ArgumentsHost) {
+    const reply = host.switchToHttp().getResponse<{ status(code: number): { send(body: unknown): void } }>();
+    this.logger.error(error);
+    const status = HttpStatus.SERVICE_UNAVAILABLE;
+    reply
+      .status(status)
+      .send({ statusCode: status, message: 'O banco de dados está indisponível no momento. Tente de novo.' });
+  }
+}
