@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { Big_Shoulders, Bricolage_Grotesque, Inter, JetBrains_Mono } from 'next/font/google';
+import { Suspense } from 'react';
+import { NavProgress } from '@/components/NavProgress';
 import { SiteFooter, SiteHeader } from '@/components/SiteHeader';
 import { getViewer } from '@/lib/session';
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/site';
@@ -36,6 +38,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="pt-BR" className={`${display.variable} ${cover.variable} ${inter.variable} ${jet.variable}`}>
       <body>
+        {/* useSearchParams exige Suspense; sem fallback (a barra só aparece ao navegar). */}
+        <Suspense fallback={null}>
+          <NavProgress />
+        </Suspense>
         <SiteHeader viewer={viewer} />
         <main>{children}</main>
         <SiteFooter />
