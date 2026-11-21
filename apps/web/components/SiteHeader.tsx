@@ -1,6 +1,7 @@
 import type { Viewer } from '@savepoint/shared';
 import Link from 'next/link';
 import { Icon } from './Icon';
+import { QuickLog } from './QuickLog';
 import { UserMenu } from './UserMenu';
 
 /** Bandeira de checkpoint: o "ponto de save" do nome. */
@@ -37,7 +38,10 @@ export function SiteHeader({ viewer }: { viewer: Viewer | null }) {
         </form>
         <div className="header-user">
           {viewer ? (
-            <UserMenu viewer={viewer} />
+            <>
+              <QuickLog />
+              <UserMenu viewer={viewer} />
+            </>
           ) : (
             <>
               <Link href="/login" className="btn btn-ghost btn-sm">

@@ -6,6 +6,7 @@ import {
   registerSchema,
   type AuthResponse,
   type ExternalGameResult,
+  type GameDetail,
   type GameSummary,
   type LibraryEntryInput,
   type ListInput,
@@ -20,6 +21,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { TOKEN_COOKIE, api, errorMessage } from '@/lib/api';
 import { safeNext, sessionCookie } from '@/lib/auth';
+import { STEAM_PATH } from '@/lib/steam';
 
 export type FormState = { error: string | null };
 type Result<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
@@ -53,7 +55,8 @@ export async function registerAction(_: FormState, form: FormData): Promise<Form
   const res = await run(() => api<AuthResponse>('/auth/register', { method: 'POST', json: parsed.data }));
   if (!res.ok) return { error: res.error };
   await startSession(res.data);
-  redirect(`/u/${res.data.user.username}`);
+  // Conta nova: sugere conectar a Steam antes de tudo (a página tem "Pular por agora").
+  redirect(`${STEAM_PATH}?bemvindo=1`);
 }
 
 export async function logoutAction() {
@@ -92,6 +95,15 @@ export async function createLogAction(input: LogEntryInput, slug: string) {
   const res = await run(() => api<{ id: string }>('/logs', { method: 'POST', json: input }));
   revalidatePath(`/games/${slug}`);
   return res;
+}
+
+/** Dados para o registro rápido (botão "+ Registrar" do cabeçalho): jogo, plataformas e estado do usuário. */
+export async function getLogContextAction(slug: string) {
+  return run(async () => {
+    const game = await api<GameDetail>(`/games/${encodeURIComponent(slug)}`);
+    const { platformList, viewer, ...summary } = game;
+    return { game: summary as GameSummary, platforms: platformList, state: viewer };
+  });
 }
 
 export async function deleteLogAction(id: string, path: string) {

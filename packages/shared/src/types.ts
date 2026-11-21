@@ -9,6 +9,14 @@ export interface UserSummary {
 
 export interface Viewer extends UserSummary {
   email: string;
+  /** Conta Steam vinculada. Só vem em GET /auth/me (o login/cadastro não preenche). */
+  steamLinked?: boolean;
+}
+
+/** Conta Steam mostrada publicamente no perfil (selo com link). */
+export interface ProfileSteam {
+  name: string | null;
+  profileUrl: string;
 }
 
 export interface AuthResponse {
@@ -166,7 +174,7 @@ export interface ProfileCounts {
 }
 
 export interface Profile {
-  user: UserSummary & { bio: string | null; createdAt: string };
+  user: UserSummary & { bio: string | null; createdAt: string; steam: ProfileSteam | null };
   isMe: boolean;
   viewerFollows: boolean;
   counts: ProfileCounts;

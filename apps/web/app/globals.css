@@ -300,6 +300,16 @@ p {
   color: var(--text);
 }
 
+.menu-panel a.menu-icon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.menu-panel a.menu-steam {
+  color: var(--info);
+}
+
 .menu-panel hr {
   border: 0;
   border-top: 1px solid var(--line);
@@ -930,6 +940,56 @@ a.chip:hover {
 .welcome h1 strong {
   color: var(--text);
   font-weight: 700;
+}
+
+/* Convite para conectar a Steam (home, só para quem ainda não conectou) */
+.steam-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 20px;
+  padding: 16px 18px;
+  border: 1px solid color-mix(in srgb, var(--info) 30%, var(--line));
+  border-radius: var(--radius-lg);
+  background: linear-gradient(100deg, color-mix(in srgb, var(--info) 12%, var(--surface)), var(--surface) 70%);
+}
+
+.steam-card > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.steam-card strong {
+  font-family: var(--font-display);
+  font-size: 17px;
+}
+
+.steam-card p {
+  margin-top: 2px;
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.steam-card-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--info) 18%, transparent);
+  color: var(--info);
+}
+
+@media (max-width: 560px) {
+  .steam-card {
+    flex-wrap: wrap;
+  }
+
+  .steam-card .btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 @media (max-width: 760px) {
@@ -1807,6 +1867,39 @@ a.chip:hover {
   margin-top: 6px;
   color: var(--text-2);
   max-width: 54ch;
+}
+
+/* Selo da conta Steam vinculada (ou convite para conectar, no próprio perfil) */
+.steam-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  margin-top: 10px;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--info) 35%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--info) 10%, transparent);
+  color: var(--info);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.steam-badge span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.steam-badge:hover {
+  border-color: var(--info);
+}
+
+.steam-badge--cta {
+  border-style: dashed;
+  background: none;
 }
 
 .hud {
@@ -3813,5 +3906,128 @@ a.chip:hover {
   .steam-account > .btn {
     grid-column: 1 / -1;
     justify-self: start;
+  }
+}
+
+.steam-connect-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* ==========================================================================
+   Registro rápido (botão "+ Registrar" do cabeçalho)
+   ========================================================================== */
+.quick-log-btn {
+  gap: 6px;
+}
+
+.quick-log-results button {
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+}
+
+.quick-log-results button:disabled {
+  opacity: 0.6;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--line-2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  translate: -50% 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 16px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.5);
+  font-size: 14px;
+}
+
+.toast svg {
+  flex: none;
+  color: var(--accent);
+}
+
+.toast span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toast a {
+  flex: none;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   Barra de progresso da navegação (NavProgress)
+   ========================================================================== */
+.nav-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  height: 3px;
+  width: 0;
+  background: linear-gradient(90deg, var(--accent), var(--info));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 60%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Avança rápido até ~30% e depois vai desacelerando — nunca chega ao fim sozinha */
+.nav-progress--loading {
+  opacity: 1;
+  animation: nav-progress 12s cubic-bezier(0.1, 0.8, 0.2, 1) forwards;
+}
+
+.nav-progress--done {
+  width: 100%;
+  opacity: 0;
+  transition: width 0.2s ease-out, opacity 0.3s 0.15s;
+}
+
+@keyframes nav-progress {
+  0% {
+    width: 0;
+  }
+  10% {
+    width: 35%;
+  }
+  100% {
+    width: 92%;
+  }
+}
+
+html.nav-pending,
+html.nav-pending a {
+  cursor: progress;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-progress--loading {
+    animation: none;
+    width: 60%;
   }
 }
