@@ -1,6 +1,8 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import { waitUntil } from '@vercel/functions';
 import { createApp } from './app.factory';
+import { POOL_IDLE_MS } from './core/prisma.service';
 
 /**
  * Porta de entrada da API como função serverless (Vercel).
@@ -19,6 +21,12 @@ function getApp() {
 }
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
+  // Segura a instância um pouco depois da resposta para o pool fechar as conexões ociosas antes da
+  // suspensão do Fluid compute (ver PrismaService). Chamado aqui porque é onde o contexto da
+  // requisição da Vercel existe com certeza; fora da Vercel o waitUntil não faz nada.
+  waitUntil(
+    new Promise<void>((resolve) => res.once('close', () => setTimeout(resolve, POOL_IDLE_MS + 100))),
+  );
   try {
     const app = await getApp();
     app.getHttpAdapter().getInstance().server.emit('request', req, res);

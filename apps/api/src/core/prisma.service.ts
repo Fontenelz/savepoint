@@ -1,8 +1,10 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
-import { attachDatabasePool } from '@vercel/functions';
 import { Pool } from 'pg';
+
+/** Conexão ociosa do pool é fechada depois deste tempo (também usado em `serverless.ts`). */
+export const POOL_IDLE_MS = 5_000;
 
 /**
  * Em produção (funções serverless) a API usa o pooler do Prisma Postgres (DATABASE_URL_POOLED).
@@ -27,9 +29,14 @@ const logger = new Logger('PrismaService');
  * Motivo: na Vercel (Fluid compute) a instância é suspensa entre pedidos e os timeouts de conexão
  * ociosa não rodam durante a suspensão. Com o pool interno, instâncias que ficavam alguns minutos
  * paradas voltavam com as conexões travadas ("Timed out fetching a new connection from the
- * connection pool", P2024) até serem descartadas. `attachDatabasePool` mantém a instância viva só
- * o bastante para fechar as conexões ociosas antes da suspensão (fora da Vercel não faz nada).
- * Guia: https://vercel.com/kb/guide/efficiently-manage-database-connection-pools-with-fluid-compute
+ * connection pool", P2024) até serem descartadas. O handler serverless (`serverless.ts`) mantém a
+ * instância viva por POOL_IDLE_MS depois de cada resposta, para o `pg` fechar as conexões ociosas
+ * antes da suspensão. Guia: https://vercel.com/kb/guide/efficiently-manage-database-connection-pools-with-fluid-compute
+ *
+ * Não usamos `attachDatabasePool` (@vercel/functions): ele pega o contexto da requisição no
+ * `pool.connect()`, mas o motor do Prisma chama o adapter por callbacks nativos, fora do
+ * AsyncLocalStorage — o contexto chega vazio e ele só loga "Pool release event triggered outside
+ * of request scope." sem segurar a instância (verificado em produção e reproduzido localmente).
  *
  * O pool conecta só na primeira consulta: uma falha momentânea do banco derruba aquela requisição
  * (503, ver DatabaseUnavailableFilter), não a subida da instância.
@@ -38,12 +45,11 @@ function createPool(): Pool {
   const pool = new Pool({
     connectionString: connectionString(),
     max: 5, // poucas por instância: o pooler distribui entre as instâncias
-    idleTimeoutMillis: 5_000, // fecha logo o que ficou ocioso (recomendação da Vercel)
+    idleTimeoutMillis: POOL_IDLE_MS, // fecha logo o que ficou ocioso (recomendação da Vercel)
     connectionTimeoutMillis: 10_000, // o padrão do pg é esperar para sempre
   });
   // Conexão ociosa que cai (ex.: pooler encerrou) emite 'error' no pool; sem listener, derruba o processo.
   pool.on('error', (e) => logger.warn(`Conexão ociosa do pool caiu: ${e.message}`));
-  attachDatabasePool(pool);
   return pool;
 }
 
