@@ -14,7 +14,6 @@ import {
   type RankingData,
 } from '@savepoint/shared';
 import {
-  MIN_STEAM_REVIEWS,
   gameSummarySelect,
   listSummarySelect,
   logSelect,
@@ -33,8 +32,7 @@ import { PrismaService } from '../core/prisma.service';
 const TRENDING_DAYS = 21;
 const TRENDING_SIZE = 12;
 
-/** Ranking geral (ver ranking()): peso da referência, em notas, e tamanho máximo da lista. */
-const RANKING_PRIOR_VOTES = 3;
+/** Ranking geral (ver ranking()): tamanho máximo da lista. */
 const RANKING_SIZE = 100;
 
 const PAGE_SIZE = 42;
@@ -329,37 +327,37 @@ export class GamesService {
   }
 
   /**
-   * Ranking geral por nota. Entra quem tem ao menos 1 nota da comunidade.
+   * Ranking geral pelas avaliações da loja da Steam (enquanto o site não tem notas suficientes da
+   * comunidade). Entra todo jogo com avaliações da Steam.
    *
-   * Nota do ranking = (n × média da comunidade + RANKING_PRIOR_VOTES × referência) ÷ (n + RANKING_PRIOR_VOTES),
-   * a média ponderada usada por MyAnimeList/IMDb: com poucas notas aqui o jogo fica perto da referência;
-   * conforme a comunidade avalia, a nota dela passa a dominar.
-   * Referência = avaliações da loja da Steam (% positivas ÷ 10) quando há ao menos MIN_STEAM_REVIEWS;
-   * sem elas, a média de todas as notas do site.
-   * Desempate: mais notas da comunidade, depois título.
+   * Nota = fórmula do SteamDB (https://steamdb.info/blog/steamdb-rating/):
+   *   % positivas − (% positivas − 50%) × 2^(−log10(avaliações + 1))
+   * Puxa para 50% quem tem poucas avaliações (99% de 2 mil não passa 98% de 959 mil) e quase não
+   * mexe em quem tem muitas. Usa o % já arredondado que guardamos (steamScore), então pode diferir
+   * um pouco do SteamDB.
+   * A nota da comunidade vai junto só como informação; não entra na ordem.
+   * Desempate: mais avaliações na Steam, depois título.
    */
   async ranking(): Promise<RankingData> {
-    const rows = await this.prisma.$queryRaw<
-      { id: string; score: number; avg: number; count: number; steamScore: number | null; steamReviews: number | null; siteAvg: number | null }[]
-    >`
-      WITH site AS (SELECT AVG("rating")::float8 AS avg FROM "UserGame" WHERE "rating" IS NOT NULL),
-      g AS (
-        SELECT g."id", g."title", g."ratingAvg"::float8 AS avg, g."ratingCount" AS count,
-               CASE WHEN g."steamReviewCount" >= ${MIN_STEAM_REVIEWS} THEN g."steamScore" END AS "steamScore",
-               CASE WHEN g."steamReviewCount" >= ${MIN_STEAM_REVIEWS} THEN g."steamReviewCount" END AS "steamReviews"
+    const [rows, [{ without }]] = await Promise.all([
+      this.prisma.$queryRaw<
+        { id: string; score: number; steamScore: number; steamReviews: number; avg: number | null; count: number }[]
+      >`
+        SELECT g."id", g."steamScore" AS "steamScore", g."steamReviewCount" AS "steamReviews",
+               g."ratingAvg"::float8 AS avg, g."ratingCount" AS count,
+               (g."steamScore" / 100.0) - (g."steamScore" / 100.0 - 0.5) * POWER(2, -LOG(g."steamReviewCount" + 1))
+                 AS score
         FROM "Game" g
-        WHERE g."ratingCount" > 0 AND g."ratingAvg" IS NOT NULL
-      )
-      SELECT g."id", g.avg, g.count, g."steamScore", g."steamReviews", site.avg AS "siteAvg",
-             (g.count * g.avg + ${RANKING_PRIOR_VOTES} * COALESCE(LEAST(GREATEST(g."steamScore" / 10.0, 1), 10), site.avg))
-               / (g.count + ${RANKING_PRIOR_VOTES}) AS score
-      FROM g CROSS JOIN site
-      ORDER BY score DESC, g.count DESC, g."title" ASC
-      LIMIT ${RANKING_SIZE}
-    `;
+        WHERE g."steamScore" IS NOT NULL AND g."steamReviewCount" > 0
+        ORDER BY score DESC, g."steamReviewCount" DESC, g."title" ASC
+        LIMIT ${RANKING_SIZE}
+      `,
+      this.prisma.$queryRaw<{ without: number }[]>`
+        SELECT COUNT(*)::int AS without FROM "Game" WHERE "steamScore" IS NULL OR COALESCE("steamReviewCount", 0) = 0
+      `,
+    ]);
     const games = await this.prisma.game.findMany({ where: { id: { in: rows.map((r) => r.id) } }, select: gameSummarySelect });
     const byId = new Map(games.map((g) => [g.id, toGameSummary(g)]));
-    const siteAvg = rows[0]?.siteAvg ?? (await this.siteRatingAvg());
     return {
       items: rows.flatMap((r, i) => {
         const game = byId.get(r.id);
@@ -369,18 +367,13 @@ export class GamesService {
             position: i + 1,
             game,
             score: Number(r.score),
-            community: { avg: Number(r.avg), count: Number(r.count) },
-            steam: r.steamScore != null && r.steamReviews != null ? { score: r.steamScore, reviews: r.steamReviews } : null,
+            steam: { score: Number(r.steamScore), reviews: Number(r.steamReviews) },
+            community: r.count > 0 && r.avg != null ? { avg: Number(r.avg), count: Number(r.count) } : null,
           },
         ];
       }),
-      method: { priorVotes: RANKING_PRIOR_VOTES, siteAvg, minSteamReviews: MIN_STEAM_REVIEWS },
+      method: { source: 'steam', gamesWithoutSteam: Number(without) },
     };
-  }
-
-  private async siteRatingAvg(): Promise<number | null> {
-    const r = await this.prisma.userGame.aggregate({ where: { rating: { not: null } }, _avg: { rating: true } });
-    return r._avg.rating;
   }
 
   /**
