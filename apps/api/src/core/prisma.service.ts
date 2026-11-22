@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { PrismaNeon } from '@prisma/adapter-neon';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 import { Pool } from 'pg';
@@ -67,7 +68,7 @@ const QUERY_TIMEOUT_MS = 10_000;
  * quanto tempo levou para obter uma conexão do pool, quanto a consulta levou e o estado do pool.
  * O aviso "em andamento" sai por timer, então aparece mesmo se a consulta nunca terminar.
  */
-function instrument(pool: Pool) {
+function instrument(pool: Pool, { neon = false } = {}) {
   const state = () => `pool total=${pool.totalCount} livres=${pool.idleCount} esperando=${pool.waitingCount}`;
   let opened = 0;
   pool.on('connect', () => {
@@ -111,17 +112,55 @@ function instrument(pool: Pool) {
         logger.warn(`consulta falhou em ${Date.now() - start} ms: ${e.message} — ${sql} (${state()})`);
         // O query_timeout do pg vem sem código; com ETIMEDOUT o adapter do Prisma o trata como
         // timeout de socket (erro conhecido → 503 no PrismaExceptionFilter) em vez de erro genérico.
-        if (e.message === 'Query read timeout' && !e.code) e.code = 'ETIMEDOUT';
+        if (e.message === 'Query read timeout' && !e.code) {
+          e.code = 'ETIMEDOUT';
+          // O adapter do Neon só converte erros com cara de erro do Postgres (exige `severity`); sem
+          // isto o erro chega cru. Só no Neon: no pg o caminho que já funciona (→ 503) fica igual.
+          if (neon) (e as { severity?: string }).severity ??= 'ERROR';
+        }
         throw e;
       },
     );
   };
 }
 
+/**
+ * Driver do banco, escolhido por `DB_DRIVER`:
+ * - `pg` (padrão): TCP direto no Postgres/pooler, com o pool instrumentado acima.
+ * - `neon`: driver serverless do Neon (`@neondatabase/serverless`), que fala com o banco por
+ *   WebSocket na porta 443 (proxy do Neon) em vez de TCP 5432. Suporta transações, ao contrário do
+ *   modo HTTP. Usa o WebSocket nativo do Node (22+). Teste para as consultas que ficam sem resposta
+ *   no pooler do Prisma Postgres — ver o PR.
+ */
+function createAdapter() {
+  const driver = process.env.DB_DRIVER ?? 'pg';
+  if (driver === 'pg') return new PrismaPg(createPool());
+  if (driver !== 'neon') throw new Error(`DB_DRIVER inválido: ${driver} (use pg ou neon)`);
+  logger.log('Driver do banco: neon (WebSocket)');
+  const factory = new PrismaNeon(
+    {
+      connectionString: connectionString(),
+      max: 5,
+      idleTimeoutMillis: POOL_IDLE_MS,
+      connectionTimeoutMillis: 10_000,
+      query_timeout: QUERY_TIMEOUT_MS, // mesmo motivo do pg: sem resposta vira 503, não 30 s presos
+    },
+    { onPoolError: (e) => logger.warn(`Conexão ociosa do pool (neon) caiu: ${e.message}`) },
+  );
+  // O PrismaNeon cria o pool só no connect(): envolve para aplicar a mesma instrumentação do pg.
+  const connect = factory.connect.bind(factory);
+  factory.connect = async () => {
+    const adapter = await connect();
+    instrument(adapter.underlyingDriver() as unknown as Pool, { neon: true });
+    return adapter;
+  };
+  return factory;
+}
+
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleDestroy {
   constructor() {
-    super({ adapter: new PrismaPg(createPool()) });
+    super({ adapter: createAdapter() });
   }
 
   async onModuleDestroy() {
