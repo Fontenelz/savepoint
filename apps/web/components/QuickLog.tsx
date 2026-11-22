@@ -54,8 +54,16 @@ export function QuickLog() {
   useEffect(() => {
     clearTimeout(timer.current);
     if (!q.trim()) return setResults([]);
-    timer.current = setTimeout(async () => setResults(await searchGamesAction(q)), 250);
-    return () => clearTimeout(timer.current);
+    // Resposta de uma busca antiga que chegue depois da atual é descartada.
+    let stale = false;
+    timer.current = setTimeout(async () => {
+      const found = await searchGamesAction(q);
+      if (!stale) setResults(found);
+    }, 250);
+    return () => {
+      stale = true;
+      clearTimeout(timer.current);
+    };
   }, [q]);
 
   // Aviso de "registrado" some sozinho.

@@ -14,10 +14,10 @@ export function Slider({ label, children, size = 'md' }: { label: string; childr
   const update = useCallback(() => {
     const el = track.current;
     if (!el) return;
-    setEdges({
-      start: el.scrollLeft <= 2,
-      end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 2,
-    });
+    const start = el.scrollLeft <= 2;
+    const end = el.scrollLeft + el.clientWidth >= el.scrollWidth - 2;
+    // Devolve o mesmo objeto quando nada mudou: o React pula a renderização (o scroll dispara isto a cada quadro).
+    setEdges((prev) => (prev.start === start && prev.end === end ? prev : { start, end }));
   }, []);
 
   useEffect(() => {
