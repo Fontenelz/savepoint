@@ -214,6 +214,28 @@ export interface Paginated<T> {
   totalPages: number;
 }
 
+/** Uma linha do ranking geral (GET /ranking). Notas na escala 1–10. */
+export interface RankingEntry {
+  position: number;
+  game: GameSummary;
+  /** Nota do ranking: média da comunidade ajustada pela quantidade de notas (ver RankingData.method). */
+  score: number;
+  community: { avg: number; count: number };
+  /** Avaliações da loja da Steam, quando o jogo tem o mínimo para servir de referência. */
+  steam: { score: number; reviews: number } | null;
+}
+
+export interface RankingData {
+  items: RankingEntry[];
+  method: {
+    /** Peso da referência, em "notas": (n × média + priorVotes × referência) ÷ (n + priorVotes). */
+    priorVotes: number;
+    /** Média de todas as notas do site (1–10): referência de quem não tem avaliações da Steam. */
+    siteAvg: number | null;
+    minSteamReviews: number;
+  };
+}
+
 export interface HomeData {
   trending: GameSummary[];
   recentReviews: LogView[];

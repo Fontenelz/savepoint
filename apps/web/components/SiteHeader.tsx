@@ -29,6 +29,7 @@ export function SiteHeader({ viewer }: { viewer: Viewer | null }) {
         <Logo />
         <nav className="nav" aria-label="Principal">
           <Link href="/games">Jogos</Link>
+          <Link href="/ranking">Ranking</Link>
           <Link href="/lists">Listas</Link>
           {viewer && <Link href="/activity">Atividade</Link>}
         </nav>
