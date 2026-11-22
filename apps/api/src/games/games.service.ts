@@ -29,6 +29,10 @@ import {
 } from '../core/mappers';
 import { PrismaService } from '../core/prisma.service';
 
+/** Top "em alta" da home (ver trendingIds). 12 = Top 10 + mural de capas. */
+const TRENDING_DAYS = 21;
+const TRENDING_SIZE = 12;
+
 /** Ranking geral (ver ranking()): peso da referência, em notas, e tamanho máximo da lista. */
 const RANKING_PRIOR_VOTES = 3;
 const RANKING_SIZE = 100;
@@ -267,16 +271,10 @@ export class GamesService {
   }
 
   async home(viewerId?: string): Promise<HomeData> {
-    const since = new Date(Date.now() - 1000 * 60 * 60 * 24 * 21);
+    const since = new Date(Date.now() - 1000 * 60 * 60 * 24 * TRENDING_DAYS);
 
-    const [trendingGroups, recentReviews, popularReviews, lists, friends, games, users, logs] = await Promise.all([
-      this.prisma.logEntry.groupBy({
-        by: ['gameId'],
-        where: { playedOn: { gte: since } },
-        _count: { gameId: true },
-        orderBy: { _count: { gameId: 'desc' } },
-        take: 12,
-      }),
+    const [ids, recentReviews, popularReviews, lists, friends, games, users, logs] = await Promise.all([
+      this.trendingIds(since),
       this.prisma.logEntry.findMany({
         where: { review: { not: null }, spoiler: false },
         orderBy: { createdAt: 'desc' },
@@ -307,14 +305,13 @@ export class GamesService {
       this.prisma.logEntry.count(),
     ]);
 
-    const ids = trendingGroups.map((g) => g.gameId);
     const trendingRows = await this.prisma.game.findMany({ where: { id: { in: ids } }, select: gameSummarySelect });
     let trending = ids.map((id) => trendingRows.find((g) => g.id === id)!).filter(Boolean);
-    if (trending.length < 12) {
+    if (trending.length < TRENDING_SIZE) {
       const filler = await this.prisma.game.findMany({
         where: { id: { notIn: ids } },
-        orderBy: { playerCount: 'desc' },
-        take: 12 - trending.length,
+        orderBy: [{ playerCount: 'desc' }, { title: 'asc' }], // desempate fixo: a ordem não muda entre visitas
+        take: TRENDING_SIZE - trending.length,
         select: gameSummarySelect,
       });
       trending = [...trending, ...filler];
@@ -384,6 +381,24 @@ export class GamesService {
   private async siteRatingAvg(): Promise<number | null> {
     const r = await this.prisma.userGame.aggregate({ where: { rating: { not: null } }, _avg: { rating: true } });
     return r._avg.rating;
+  }
+
+  /**
+   * "Em alta": jogos registrados no diário nos últimos TRENDING_DAYS dias, ordenados pelo número de
+   * **pessoas** que os registraram — vários registros da mesma pessoa contam uma vez.
+   * Desempate fixo (a ordem não muda entre visitas): jogado mais recentemente, playerCount, título.
+   */
+  private async trendingIds(since: Date): Promise<string[]> {
+    const rows = await this.prisma.$queryRaw<{ gameId: string }[]>`
+      SELECT l."gameId"
+      FROM "LogEntry" l
+      JOIN "Game" g ON g."id" = l."gameId"
+      WHERE l."playedOn" >= ${since}
+      GROUP BY l."gameId", g."playerCount", g."title"
+      ORDER BY COUNT(DISTINCT l."userId") DESC, MAX(l."playedOn") DESC, g."playerCount" DESC, g."title" ASC
+      LIMIT ${TRENDING_SIZE}
+    `;
+    return rows.map((r) => r.gameId);
   }
 
   async searchLite(q: string): Promise<GameSummary[]> {
