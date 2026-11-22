@@ -19,12 +19,13 @@ async function all<T>(path: string, maxPages = 200): Promise<T[]> {
   return out;
 }
 
-/** Home, catálogo, listas, todos os jogos e listas públicas. Perfis ficam de fora de propósito. */
+/** Home, catálogo, ranking, listas, todos os jogos e listas públicas. Perfis ficam de fora de propósito. */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [games, lists] = await Promise.all([all<GameSummary>('/games?sort=title'), all<ListSummary>('/lists')]);
   return [
     { url: `${SITE_URL}/`, changeFrequency: 'daily', priority: 1 },
     { url: `${SITE_URL}/games`, changeFrequency: 'daily', priority: 0.8 },
+    { url: `${SITE_URL}/ranking`, changeFrequency: 'daily', priority: 0.7 },
     { url: `${SITE_URL}/lists`, changeFrequency: 'daily', priority: 0.6 },
     ...games.map((g) => ({ url: `${SITE_URL}/games/${g.slug}`, changeFrequency: 'weekly' as const, priority: 0.7 })),
     ...lists.map((l) => ({

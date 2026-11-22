@@ -15,6 +15,11 @@ export class GamesController {
     return this.games.home(user?.id);
   }
 
+  @Get('ranking')
+  ranking() {
+    return this.games.ranking();
+  }
+
   @Get('meta')
   meta() {
     return this.games.meta();

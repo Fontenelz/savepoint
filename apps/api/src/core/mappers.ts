@@ -130,7 +130,7 @@ export const userGameStateSelect = {
 type StateRow = Prisma.UserGameGetPayload<{ select: typeof userGameStateSelect }>;
 
 /** Abaixo disso a % da Steam oscila demais para virar sugestão. */
-const MIN_STEAM_REVIEWS = 20;
+export const MIN_STEAM_REVIEWS = 20;
 
 /** % de avaliações positivas → nota de 1 a 10 (96% → 10 = 5★, 91% → 9, 75% → 8, 50% → 5). */
 export function steamScoreToRating(score: number) {
