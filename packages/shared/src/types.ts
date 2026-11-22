@@ -5,12 +5,16 @@ export interface UserSummary {
   username: string;
   displayName: string;
   avatarHue: number;
+  /** Foto da conta Steam (ou Google); null → silhueta. */
+  avatarUrl: string | null;
 }
 
 export interface Viewer extends UserSummary {
   email: string;
   /** Conta Steam vinculada. Só vem em GET /auth/me (o login/cadastro não preenche). */
   steamLinked?: boolean;
+  /** Conta Google conectada. Só vem em GET /auth/me. */
+  googleLinked?: boolean;
 }
 
 /** Conta Steam mostrada publicamente no perfil (selo com link). */

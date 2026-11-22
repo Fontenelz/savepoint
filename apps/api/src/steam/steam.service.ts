@@ -12,6 +12,8 @@ import { CatalogService } from '../catalog/catalog.service';
 import { SteamStoreClient, plainText, type SteamAppDetails } from '../catalog/providers/steam-store.client';
 import { STEAM_HOSTS } from '../catalog/providers/wiki-steam.source';
 import { gameSummarySelect, toGameSummary } from '../core/mappers';
+import { AuthService } from '../auth/auth.service';
+import { applyAccountProfile } from '../core/account-profile';
 import { MediaService } from '../core/media.service';
 import { PrismaService } from '../core/prisma.service';
 import { StatsService } from '../core/stats.service';
@@ -43,6 +45,7 @@ export class SteamService {
     private readonly media: MediaService,
     private readonly catalog: CatalogService,
     private readonly games: GamesService,
+    private readonly auth: AuthService,
   ) {}
 
   enabled() {
@@ -71,7 +74,31 @@ export class SteamService {
       },
       select: accountSelect,
     });
+    await applyAccountProfile(this.prisma, userId);
     return this.toAccount(u);
+  }
+
+  /**
+   * "Entrar com a Steam": só para contas que já conectaram a Steam (a Steam não fornece e-mail,
+   * e criar conta só com ela não foi adotado). Atualiza nome/avatar da Steam a cada login.
+   */
+  async login(params: Record<string, string>) {
+    const steamId = await this.steam.verifyOpenId(params);
+    const owner = await this.prisma.user.findUnique({ where: { steamId }, select: { id: true } });
+    if (!owner) {
+      throw new NotFoundException(
+        'Essa conta Steam não está conectada a nenhum usuário. Entre com sua conta e conecte a Steam em Configurações.',
+      );
+    }
+    const player = await this.steam.player(steamId).catch(() => null);
+    if (player) {
+      await this.prisma.user.update({
+        where: { id: owner.id },
+        data: { steamName: player.name, steamAvatar: player.avatarUrl },
+      });
+    }
+    await applyAccountProfile(this.prisma, owner.id);
+    return this.auth.sessionFor(owner.id);
   }
 
   async unlink(userId: string) {
@@ -80,6 +107,8 @@ export class SteamService {
       where: { id: userId },
       data: { steamId: null, steamName: null, steamAvatar: null, steamLinkedAt: null, steamSyncedAt: null },
     });
+    // Sem Steam, foto/nome voltam para o Google (se conectado) ou ficam como estão.
+    await applyAccountProfile(this.prisma, userId);
   }
 
   /** Prévia da biblioteca: jogos da Steam cruzados com o catálogo e com a estante do usuário. */

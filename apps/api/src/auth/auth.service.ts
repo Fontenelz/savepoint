@@ -9,6 +9,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import type { AuthResponse, GoogleAuthResponse, LoginInput, RegisterInput, Viewer } from '@savepoint/shared';
 import { compare, hash } from 'bcryptjs';
+import { applyAccountProfile } from '../core/account-profile';
 import { PrismaService } from '../core/prisma.service';
 import { GoogleAuthService } from './google.service';
 
@@ -16,7 +17,7 @@ import { GoogleAuthService } from './google.service';
 const MAX_FAILURES = 8;
 const WINDOW_MS = 15 * 60 * 1000;
 
-const viewerSelect = { id: true, username: true, displayName: true, avatarHue: true, email: true };
+const viewerSelect = { id: true, username: true, displayName: true, avatarHue: true, avatarUrl: true, email: true };
 
 @Injectable()
 export class AuthService {
@@ -71,41 +72,53 @@ export class AuthService {
   /**
    * Login com Google: entra na conta ligada ao Google; senão, liga à conta com o mesmo
    * e-mail (verificado pelo Google); senão, cria uma conta nova.
+   * Nome e foto do Google são guardados a cada login (foto/nome exibidos: ver applyAccountProfile).
    */
   async loginWithGoogle(code: string, redirectUri: string): Promise<GoogleAuthResponse> {
     const profile = await this.google.profileFromCode(code, redirectUri);
+    const googleData = { googleId: profile.googleId, googleName: profile.name, googleAvatar: profile.picture };
 
-    const linked = await this.prisma.user.findUnique({ where: { googleId: profile.googleId }, select: viewerSelect });
-    if (linked) return { ...(await this.issue(linked)), created: false };
+    const linked = await this.prisma.user.findUnique({ where: { googleId: profile.googleId }, select: { id: true } });
+    const byEmail = linked
+      ? null
+      : await this.prisma.user.findUnique({ where: { email: profile.email }, select: { id: true } });
+    const existing = linked ?? byEmail;
 
-    const byEmail = await this.prisma.user.findUnique({ where: { email: profile.email }, select: { id: true } });
-    if (byEmail) {
-      const user = await this.prisma.user.update({
-        where: { id: byEmail.id },
-        data: { googleId: profile.googleId },
-        select: viewerSelect,
+    let userId: string;
+    if (existing) {
+      await this.prisma.user.update({ where: { id: existing.id }, data: googleData });
+      userId = existing.id;
+    } else {
+      const created = await this.prisma.user.create({
+        data: {
+          username: await this.google.uniqueUsername(profile.email),
+          email: profile.email,
+          displayName: profile.name,
+          avatarHue: Math.floor(Math.random() * 360),
+          ...googleData,
+        },
+        select: { id: true },
       });
-      return { ...(await this.issue(user)), created: false };
+      userId = created.id;
     }
+    await applyAccountProfile(this.prisma, userId);
+    return { ...(await this.sessionFor(userId)), created: !existing };
+  }
 
-    const user = await this.prisma.user.create({
-      data: {
-        username: await this.google.uniqueUsername(profile.email),
-        email: profile.email,
-        displayName: profile.name,
-        googleId: profile.googleId,
-        avatarHue: Math.floor(Math.random() * 360),
-      },
-      select: viewerSelect,
-    });
-    return { ...(await this.issue(user)), created: true };
+  /** Sessão (token + dados do usuário) para uma conta já autenticada por outro meio (Google, Steam). */
+  async sessionFor(userId: string): Promise<AuthResponse> {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: viewerSelect });
+    return this.issue(user);
   }
 
   async me(userId: string): Promise<Viewer> {
-    const row = await this.prisma.user.findUnique({ where: { id: userId }, select: { ...viewerSelect, steamId: true } });
+    const row = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { ...viewerSelect, steamId: true, googleId: true },
+    });
     if (!row) throw new NotFoundException('Usuário não encontrado');
-    const { steamId, ...user } = row;
-    return { ...user, steamLinked: Boolean(steamId) };
+    const { steamId, googleId, ...user } = row;
+    return { ...user, steamLinked: Boolean(steamId), googleLinked: Boolean(googleId) };
   }
 
   private async assertNotThrottled(key: string) {

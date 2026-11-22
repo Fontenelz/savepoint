@@ -21,19 +21,30 @@ export function Stars({ rating, className = '' }: { rating: number | null | unde
   );
 }
 
-/** Avatar sem foto: silhueta de pessoa sobre a cor própria do usuário. */
-export function Avatar({ user, size = 32 }: { user: Pick<UserSummary, 'displayName' | 'avatarHue'>; size?: number }) {
+/** Avatar: foto da conta Steam/Google quando houver; senão, silhueta sobre a cor própria do usuário. */
+export function Avatar({
+  user,
+  size = 32,
+}: {
+  user: Pick<UserSummary, 'displayName' | 'avatarHue'> & { avatarUrl?: string | null };
+  size?: number;
+}) {
   return (
     <span
-      className="avatar"
+      className={`avatar${user.avatarUrl ? ' has-photo' : ''}`}
       style={{ '--h': user.avatarHue, '--size': `${size}px` } as CSSProperties}
       role="img"
       aria-label={user.displayName}
     >
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="12" cy="9.2" r="4.3" />
-        <path d="M3.2 24c0-5.3 3.9-8.6 8.8-8.6s8.8 3.3 8.8 8.6z" />
-      </svg>
+      {user.avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={user.avatarUrl} alt="" loading="lazy" referrerPolicy="no-referrer" />
+      ) : (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="9.2" r="4.3" />
+          <path d="M3.2 24c0-5.3 3.9-8.6 8.8-8.6s8.8 3.3 8.8 8.6z" />
+        </svg>
+      )}
     </span>
   );
 }

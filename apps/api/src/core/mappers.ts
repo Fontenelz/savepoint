@@ -7,6 +7,7 @@ export const userSummarySelect = {
   id: true,
   username: true,
   displayName: true,
+  avatarUrl: true,
   avatarHue: true,
 } satisfies Prisma.UserSelect;
 

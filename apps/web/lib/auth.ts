@@ -19,12 +19,24 @@ export const GOOGLE_STATE_COOKIE = 'sp_google_state';
 export const GOOGLE_PATH = '/auth/google';
 export const googleCallbackUrl = (origin: string) => `${origin}${GOOGLE_PATH}/callback`;
 
-/** Códigos de erro do login com Google → mensagem na tela de login. */
+/** Login com a Steam (OpenID) — só para contas que já conectaram a Steam. */
+export const STEAM_LOGIN_STATE_COOKIE = 'sp_steam_login';
+export const STEAM_LOGIN_PATH = '/auth/steam';
+export const steamLoginCallbackUrl = (origin: string, state: string) =>
+  `${origin}${STEAM_LOGIN_PATH}/callback?state=${encodeURIComponent(state)}`;
+
+/** Códigos de erro do login com Google/Steam → mensagem na tela de login. */
 export const GOOGLE_ERRORS: Record<string, string> = {
   google_off: 'O login com Google não está disponível no momento.',
   google_cancelled: 'Login com Google cancelado.',
   google_state: 'O login expirou ou não foi iniciado aqui. Tente de novo.',
   google_failed: 'Não foi possível entrar com o Google. Tente de novo.',
+  steam_off: 'O login com a Steam não está disponível no momento.',
+  steam_cancelled: 'Login com a Steam cancelado.',
+  steam_state: 'O login expirou ou não foi iniciado aqui. Tente de novo.',
+  steam_unlinked:
+    'Essa conta Steam não está conectada a nenhum usuário. Entre com sua conta e conecte a Steam em Menu → Conectar Steam.',
+  steam_failed: 'Não foi possível entrar com a Steam. Tente de novo.',
 };
 
 /**
