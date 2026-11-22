@@ -48,3 +48,21 @@ export class DatabaseUnavailableFilter implements ExceptionFilter {
     reply.status(status).send({ statusCode: status, message: DB_UNAVAILABLE });
   }
 }
+
+/**
+ * Consulta sem resposta pelo driver do Neon (DB_DRIVER=neon): o adapter não traduz o
+ * "Query read timeout" do pool em erro conhecido, então ele chega como erro desconhecido do Prisma.
+ * Esse caso vira 503 (como no driver pg); qualquer outro erro desconhecido continua 500.
+ */
+@Catch(Prisma.PrismaClientUnknownRequestError)
+export class UnknownRequestFilter implements ExceptionFilter {
+  private readonly logger = new Logger(UnknownRequestFilter.name);
+
+  catch(error: Prisma.PrismaClientUnknownRequestError, host: ArgumentsHost) {
+    const reply = host.switchToHttp().getResponse<{ status(code: number): { send(body: unknown): void } }>();
+    this.logger.error(error);
+    const timeout = error.message.includes('Query read timeout');
+    const status = timeout ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.INTERNAL_SERVER_ERROR;
+    reply.status(status).send({ statusCode: status, message: timeout ? DB_UNAVAILABLE : 'Erro interno' });
+  }
+}

@@ -4,7 +4,7 @@ import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify
 import { mkdirSync } from 'node:fs';
 import { AppModule } from './app.module';
 import { MediaService } from './core/media.service';
-import { DatabaseUnavailableFilter, PrismaExceptionFilter } from './core/prisma-exception.filter';
+import { DatabaseUnavailableFilter, PrismaExceptionFilter, UnknownRequestFilter } from './core/prisma-exception.filter';
 
 /**
  * Cria e configura o app Nest. Usado tanto pelo servidor local (main.ts)
@@ -27,7 +27,7 @@ export async function createApp(): Promise<NestFastifyApplication> {
     });
 
   app.setGlobalPrefix('api');
-  app.useGlobalFilters(new PrismaExceptionFilter(), new DatabaseUnavailableFilter());
+  app.useGlobalFilters(new PrismaExceptionFilter(), new DatabaseUnavailableFilter(), new UnknownRequestFilter());
   app.enableCors({
     origin: (process.env.WEB_ORIGIN ?? 'http://localhost:3000').split(','),
     credentials: true,
