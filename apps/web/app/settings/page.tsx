@@ -23,7 +23,10 @@ export default async function SettingsPage() {
         </p>
       </div>
       <div className="section">
-        <ProfileForm user={profile.user} />
+        <ProfileForm
+          user={profile.user}
+          syncedWith={viewer.steamLinked ? 'Steam' : viewer.googleLinked ? 'Google' : null}
+        />
       </div>
       <div className="section">
         <Link href="/settings/steam" className="settings-link">

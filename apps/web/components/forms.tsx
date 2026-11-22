@@ -25,9 +25,13 @@ function Submit({ pending, children }: { pending: boolean; children: React.React
   );
 }
 
-/** Link comum (não <Link>): a rota redireciona para o Google. */
-function GoogleButton({ next, divider = 'ou com usuário e senha' }: { next?: string; divider?: string }) {
-  const href = next ? `/auth/google?next=${encodeURIComponent(next)}` : '/auth/google';
+/**
+ * Links comuns (não <Link>): as rotas redirecionam para o Google/Steam.
+ * `steam`: "Entrar com a Steam" — só no login (funciona para quem já conectou a Steam).
+ */
+function GoogleButton({ next, divider = 'ou com usuário e senha', steam = false }: { next?: string; divider?: string; steam?: boolean }) {
+  const q = next ? `?next=${encodeURIComponent(next)}` : '';
+  const href = `/auth/google${q}`;
   return (
     <>
       <a href={href} className="btn btn-lg btn-block btn-google">
@@ -39,6 +43,12 @@ function GoogleButton({ next, divider = 'ou com usuário e senha' }: { next?: st
         </svg>
         Continuar com Google
       </a>
+      {steam && (
+        <a href={`/auth/steam${q}`} className="btn btn-lg btn-block btn-steam">
+          <Icon name="gamepad" size={18} />
+          Entrar com a Steam
+        </a>
+      )}
       <div className="auth-divider">
         <span>{divider}</span>
       </div>
@@ -55,7 +65,7 @@ export function LoginForm({ next, error }: { next?: string; error?: string | nul
         Só quer explorar? Entre com <code>demo</code> / <code>savepoint123</code>
       </div>
       {(state.error ?? error) && <div className="form-error">{state.error ?? error}</div>}
-      <GoogleButton next={next} />
+      <GoogleButton next={next} steam />
       <input type="hidden" name="next" value={next ?? ''} />
       <label className="field">
         <span>Usuário ou e-mail</span>
@@ -107,7 +117,14 @@ export function RegisterForm() {
   );
 }
 
-export function ProfileForm({ user }: { user: UserSummary & { bio: string | null } }) {
+/** `syncedWith`: conta conectada cujo nome/foto o perfil segue (Steam tem prioridade sobre Google). */
+export function ProfileForm({
+  user,
+  syncedWith = null,
+}: {
+  user: UserSummary & { bio: string | null };
+  syncedWith?: 'Steam' | 'Google' | null;
+}) {
   const [state, action, pending] = useActionState(updateProfileAction, initial);
   return (
     <form action={action} style={{ display: 'grid', gap: 16, maxWidth: 480 }}>
@@ -115,6 +132,11 @@ export function ProfileForm({ user }: { user: UserSummary & { bio: string | null
       <label className="field">
         <span>Nome de exibição</span>
         <input className="input" name="displayName" defaultValue={user.displayName} required maxLength={40} />
+        {syncedWith && (
+          <small className="muted">
+            Com a conta {syncedWith} conectada, o nome e a foto seguem os da {syncedWith} a cada login.
+          </small>
+        )}
       </label>
       <label className="field">
         <span>Bio</span>

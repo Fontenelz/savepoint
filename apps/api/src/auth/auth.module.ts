@@ -19,6 +19,6 @@ import { GoogleAuthService } from './google.service';
   ],
   controllers: [AuthController],
   providers: [AuthService, GoogleAuthService, AuthGuard],
-  exports: [JwtModule, AuthGuard],
+  exports: [JwtModule, AuthGuard, AuthService],
 })
 export class AuthModule {}

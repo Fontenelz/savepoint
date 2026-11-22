@@ -16,12 +16,15 @@ interface IdTokenClaims {
   email_verified?: boolean;
   name?: string;
   given_name?: string;
+  picture?: string;
 }
 
 export interface GoogleProfile {
   googleId: string;
   email: string;
   name: string;
+  /** Foto da conta Google (escopo "profile"), quando houver. */
+  picture: string | null;
 }
 
 /**
@@ -96,6 +99,7 @@ export class GoogleAuthService {
       googleId: claims.sub,
       email: claims.email.toLowerCase(),
       name: (claims.name ?? claims.given_name ?? claims.email.split('@')[0]).slice(0, 40),
+      picture: claims.picture?.startsWith('https://') ? claims.picture : null,
     };
   }
 

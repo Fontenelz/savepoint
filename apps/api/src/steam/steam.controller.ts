@@ -26,6 +26,13 @@ export class SteamController {
     return this.steam.link(user.id, body.params);
   }
 
+  /** Login com a Steam (OpenID) para contas que já conectaram a Steam. Público. */
+  @Post('login')
+  @HttpCode(200)
+  login(@Body(new ZodPipe(steamLinkSchema)) body: SteamLinkInput) {
+    return this.steam.login(body.params);
+  }
+
   @Delete('link')
   @Auth()
   @HttpCode(204)
