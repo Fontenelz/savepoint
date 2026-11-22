@@ -30,7 +30,6 @@ import { PrismaService } from '../core/prisma.service';
 /** Top "em alta" da home (ver trendingIds). 12 = Top 10 + mural de capas. */
 const TRENDING_DAYS = 21;
 const TRENDING_SIZE = 12;
-const TRENDING_MAX_WEIGHT = 3;
 
 const PAGE_SIZE = 42;
 
@@ -324,30 +323,18 @@ export class GamesService {
   }
 
   /**
-   * "Em alta": jogos registrados no diário nos últimos TRENDING_DAYS dias.
-   * - Cada pessoa conta uma vez por jogo (vários registros da mesma pessoa não inflam o jogo).
-   * - Pesa pelo tempo de jogo dela no jogo (horas da estante; sem elas, o maior valor dos registros):
-   *   1 + log10(1 + horas), no máximo TRENDING_MAX_WEIGHT. 0 h → 1; 1 h → 1,3; 10 h → 2; 100 h+ → 3.
-   *   Logarítmico para quem jogou mais pesar mais sem que uma pessoa com centenas de horas decida
-   *   o ranking sozinha (na base atual: mediana 21 h, máximo 282 h).
-   * - Desempate fixo: nº de pessoas, jogado mais recentemente, playerCount, título.
+   * "Em alta": jogos registrados no diário nos últimos TRENDING_DAYS dias, ordenados pelo número de
+   * **pessoas** que os registraram — vários registros da mesma pessoa contam uma vez.
+   * Desempate fixo (a ordem não muda entre visitas): jogado mais recentemente, playerCount, título.
    */
   private async trendingIds(since: Date): Promise<string[]> {
     const rows = await this.prisma.$queryRaw<{ gameId: string }[]>`
-      WITH per_person AS (
-        SELECT l."gameId", l."userId", MAX(l."playedOn") AS last_played,
-               COALESCE(MAX(ug."hoursPlayed"), MAX(l."hours"), 0) AS hours
-        FROM "LogEntry" l
-        LEFT JOIN "UserGame" ug ON ug."userId" = l."userId" AND ug."gameId" = l."gameId"
-        WHERE l."playedOn" >= ${since}
-        GROUP BY l."gameId", l."userId"
-      )
-      SELECT p."gameId"
-      FROM per_person p
-      JOIN "Game" g ON g."id" = p."gameId"
-      GROUP BY p."gameId", g."playerCount", g."title"
-      ORDER BY SUM(LEAST(1 + LOG(1 + GREATEST(p.hours, 0)), ${TRENDING_MAX_WEIGHT})) DESC,
-               COUNT(*) DESC, MAX(p.last_played) DESC, g."playerCount" DESC, g."title" ASC
+      SELECT l."gameId"
+      FROM "LogEntry" l
+      JOIN "Game" g ON g."id" = l."gameId"
+      WHERE l."playedOn" >= ${since}
+      GROUP BY l."gameId", g."playerCount", g."title"
+      ORDER BY COUNT(DISTINCT l."userId") DESC, MAX(l."playedOn") DESC, g."playerCount" DESC, g."title" ASC
       LIMIT ${TRENDING_SIZE}
     `;
     return rows.map((r) => r.gameId);
