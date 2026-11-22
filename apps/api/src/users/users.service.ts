@@ -54,6 +54,8 @@ export class UsersService {
         ...userSummarySelect,
         bio: true,
         createdAt: true,
+        steamId: true,
+        steamName: true,
         _count: { select: { followers: true, following: true, lists: true } },
       },
     });
@@ -127,9 +129,14 @@ export class UsersService {
         .slice(0, 6);
     };
 
-    const { _count, ...summary } = user;
+    const { _count, steamId, steamName, ...summary } = user;
     return {
-      user: { ...summary, createdAt: user.createdAt.toISOString() },
+      user: {
+        ...summary,
+        createdAt: user.createdAt.toISOString(),
+        // Selo no perfil: o link é o mesmo perfil público da Steam que a pessoa vinculou.
+        steam: steamId ? { name: steamName, profileUrl: `https://steamcommunity.com/profiles/${steamId}` } : null,
+      },
       isMe: viewerId === user.id,
       viewerFollows: Boolean(follows),
       counts: {

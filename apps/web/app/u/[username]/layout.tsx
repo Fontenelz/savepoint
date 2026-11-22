@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Avatar } from '@/components/bits';
 import { FollowButton } from '@/components/FollowButton';
+import { Icon } from '@/components/Icon';
 import { ProfileTabs } from '@/components/ProfileTabs';
 import { getProfile } from '@/lib/profile';
 import { getViewer } from '@/lib/session';
@@ -33,6 +34,17 @@ export default async function ProfileLayout({
             ) : null}
           </h1>
           {user.bio && <p>{user.bio}</p>}
+          {user.steam ? (
+            <a href={user.steam.profileUrl} target="_blank" rel="noreferrer" className="steam-badge" title="Perfil na Steam">
+              <Icon name="gamepad" size={13} />
+              Steam{user.steam.name && <span>· {user.steam.name}</span>}
+              <Icon name="external" size={11} />
+            </a>
+          ) : profile.isMe ? (
+            <Link href="/settings/steam" className="steam-badge steam-badge--cta">
+              <Icon name="gamepad" size={13} /> Conectar Steam
+            </Link>
+          ) : null}
         </div>
         <div className="hud">
           <Link href={`${base}/games?filter=played`}>

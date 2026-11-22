@@ -2,6 +2,7 @@ import type { GoogleAuthResponse } from '@savepoint/shared';
 import { NextResponse, type NextRequest } from 'next/server';
 import { TOKEN_COOKIE, api } from '@/lib/api';
 import { GOOGLE_PATH, GOOGLE_STATE_COOKIE, googleCallbackUrl, noStore, safeNext, sessionCookie } from '@/lib/auth';
+import { STEAM_PATH } from '@/lib/steam';
 
 /**
  * Retorno do Google. Confere o state aqui; a API troca o código pelos dados da conta
@@ -32,8 +33,9 @@ export async function GET(req: NextRequest) {
       method: 'POST',
       json: { code, redirectUri: googleCallbackUrl(req.nextUrl.origin) },
     });
-    // Conta nova vai para o perfil (como no cadastro normal); quem já tinha conta volta para onde estava.
-    const target = auth.created ? `/u/${auth.user.username}` : (safeNext(saved.next) ?? '/');
+    // Conta nova vai para a sugestão de conectar a Steam (como no cadastro normal); quem já tinha
+    // conta volta para onde estava.
+    const target = auth.created ? `${STEAM_PATH}?bemvindo=1` : (safeNext(saved.next) ?? '/');
     return go(target, auth.token);
   } catch {
     return go('/login?error=google_failed');

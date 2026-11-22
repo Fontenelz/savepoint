@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
 import { logoutAction } from '@/app/actions';
 import { Avatar } from './bits';
+import { Icon } from './Icon';
 
 /**
  * Menu do usuário no cabeçalho. Controlado pelo React (em vez de <details> nativo):
@@ -66,6 +67,9 @@ export function UserMenu({ viewer }: { viewer: Viewer }) {
           <hr />
           <Link href="/lists/new" role="menuitem">Nova lista</Link>
           <Link href="/games/new" role="menuitem">Cadastrar jogo</Link>
+          <Link href="/settings/steam" role="menuitem" className={viewer.steamLinked ? 'menu-icon' : 'menu-icon menu-steam'}>
+            <Icon name="gamepad" size={14} /> {viewer.steamLinked ? 'Steam' : 'Conectar Steam'}
+          </Link>
           <Link href="/settings" role="menuitem">Editar perfil</Link>
           <hr />
           <form action={logoutAction}>

@@ -11,7 +11,7 @@ import { STEAM_ERRORS, STEAM_PATH } from '@/lib/steam';
 // Página pessoal: fora da busca.
 export const metadata: Metadata = { title: 'Steam', robots: { index: false, follow: false } };
 
-type Props = { searchParams: Promise<{ linked?: string; error?: string }> };
+type Props = { searchParams: Promise<{ linked?: string; error?: string; bemvindo?: string }> };
 
 const dateFmt = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -36,16 +36,30 @@ export default async function SteamPage({ searchParams }: Props) {
   }
 
   const error = sp.error ? (STEAM_ERRORS[sp.error] ?? STEAM_ERRORS.failed) : null;
+  const profilePath = `/u/${viewer.username}`;
+  // Logo após criar a conta (cadastro ou Google): boas-vindas + opção de pular.
+  const welcome = Boolean(sp.bemvindo) && !account;
+  if (welcome && !status.enabled) redirect(profilePath);
 
   return (
     <div className="shell form-page steam-page">
-      <div className="page-head">
-        <Link href="/settings" className="steam-back">
-          Editar perfil
-        </Link>
-        <h1 className="page-title">Steam</h1>
-        <p>Conecte sua conta para trazer sua biblioteca e suas horas de jogo para a estante.</p>
-      </div>
+      {welcome ? (
+        <div className="page-head">
+          <h1 className="page-title">Conta criada! Comece com a estante cheia</h1>
+          <p>
+            Conecte sua Steam e todos os seus jogos entram na estante com as horas jogadas. Se preferir, dá para fazer
+            isso depois em <strong>Menu → Conectar Steam</strong>.
+          </p>
+        </div>
+      ) : (
+        <div className="page-head">
+          <Link href="/settings" className="steam-back">
+            Editar perfil
+          </Link>
+          <h1 className="page-title">Steam</h1>
+          <p>Conecte sua conta para trazer sua biblioteca e suas horas de jogo para a estante.</p>
+        </div>
+      )}
 
       {error && <div className="form-error">{error}</div>}
       {sp.linked && account && (
@@ -66,9 +80,16 @@ export default async function SteamPage({ searchParams }: Props) {
             <li>Status que você já marcou não são alterados.</li>
           </ul>
           {/* Link comum (não <Link>): a rota redireciona para fora do site. */}
-          <a href={`${STEAM_PATH}/connect`} className="btn btn-primary btn-lg">
-            Conectar com a Steam
-          </a>
+          <div className="steam-connect-actions">
+            <a href={`${STEAM_PATH}/connect`} className="btn btn-primary btn-lg">
+              Conectar com a Steam
+            </a>
+            {welcome && (
+              <Link href={profilePath} className="btn btn-ghost btn-lg">
+                Pular por agora
+              </Link>
+            )}
+          </div>
         </section>
       ) : (
         <>

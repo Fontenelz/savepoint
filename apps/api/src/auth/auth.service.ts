@@ -102,9 +102,10 @@ export class AuthService {
   }
 
   async me(userId: string): Promise<Viewer> {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: viewerSelect });
-    if (!user) throw new NotFoundException('Usuário não encontrado');
-    return user;
+    const row = await this.prisma.user.findUnique({ where: { id: userId }, select: { ...viewerSelect, steamId: true } });
+    if (!row) throw new NotFoundException('Usuário não encontrado');
+    const { steamId, ...user } = row;
+    return { ...user, steamLinked: Boolean(steamId) };
   }
 
   private async assertNotThrottled(key: string) {

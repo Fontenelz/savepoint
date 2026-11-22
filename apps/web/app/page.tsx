@@ -28,6 +28,21 @@ export default async function HomePage() {
           <h1>
             Bem-vindo de volta, <strong>{viewer.displayName.split(' ')[0]}</strong>. Veja o que seus amigos andam jogando.
           </h1>
+          {/* === false: sem a informação (API antiga), não mostra. */}
+          {viewer.steamLinked === false && (
+            <div className="steam-card">
+              <span className="steam-card-icon">
+                <Icon name="gamepad" size={22} />
+              </span>
+              <div>
+                <strong>Traga sua biblioteca da Steam</strong>
+                <p>Seus jogos e horas jogadas entram na estante de uma vez. Leva menos de um minuto.</p>
+              </div>
+              <Link href="/settings/steam" className="btn btn-primary">
+                Conectar Steam
+              </Link>
+            </div>
+          )}
         </section>
       ) : (
         <section className="hero">
