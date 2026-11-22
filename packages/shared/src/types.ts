@@ -214,25 +214,24 @@ export interface Paginated<T> {
   totalPages: number;
 }
 
-/** Uma linha do ranking geral (GET /ranking). Notas na escala 1–10. */
+/** Uma linha do ranking geral (GET /ranking). */
 export interface RankingEntry {
   position: number;
   game: GameSummary;
-  /** Nota do ranking: média da comunidade ajustada pela quantidade de notas (ver RankingData.method). */
+  /** Nota do ranking, de 0 a 1: avaliações da Steam pela fórmula do SteamDB (ver GamesService.ranking). */
   score: number;
-  community: { avg: number; count: number };
-  /** Avaliações da loja da Steam, quando o jogo tem o mínimo para servir de referência. */
-  steam: { score: number; reviews: number } | null;
+  /** Avaliações da loja da Steam: % positivas (0–100) e total. */
+  steam: { score: number; reviews: number };
+  /** Nota da comunidade (1–10), só informativa: não entra na ordem. */
+  community: { avg: number; count: number } | null;
 }
 
 export interface RankingData {
   items: RankingEntry[];
   method: {
-    /** Peso da referência, em "notas": (n × média + priorVotes × referência) ÷ (n + priorVotes). */
-    priorVotes: number;
-    /** Média de todas as notas do site (1–10): referência de quem não tem avaliações da Steam. */
-    siteAvg: number | null;
-    minSteamReviews: number;
+    source: 'steam';
+    /** Jogos do catálogo sem avaliações da Steam (ficam fora do ranking). */
+    gamesWithoutSteam: number;
   };
 }
 
