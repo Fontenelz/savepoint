@@ -27,6 +27,11 @@ import {
 } from '../core/mappers';
 import { PrismaService } from '../core/prisma.service';
 
+/** Top "em alta" da home (ver trendingIds). 12 = Top 10 + mural de capas. */
+const TRENDING_DAYS = 21;
+const TRENDING_SIZE = 12;
+const TRENDING_MAX_WEIGHT = 3;
+
 const PAGE_SIZE = 42;
 
 @Injectable()
@@ -261,16 +266,10 @@ export class GamesService {
   }
 
   async home(viewerId?: string): Promise<HomeData> {
-    const since = new Date(Date.now() - 1000 * 60 * 60 * 24 * 21);
+    const since = new Date(Date.now() - 1000 * 60 * 60 * 24 * TRENDING_DAYS);
 
-    const [trendingGroups, recentReviews, popularReviews, lists, friends, games, users, logs] = await Promise.all([
-      this.prisma.logEntry.groupBy({
-        by: ['gameId'],
-        where: { playedOn: { gte: since } },
-        _count: { gameId: true },
-        orderBy: { _count: { gameId: 'desc' } },
-        take: 12,
-      }),
+    const [ids, recentReviews, popularReviews, lists, friends, games, users, logs] = await Promise.all([
+      this.trendingIds(since),
       this.prisma.logEntry.findMany({
         where: { review: { not: null }, spoiler: false },
         orderBy: { createdAt: 'desc' },
@@ -301,14 +300,13 @@ export class GamesService {
       this.prisma.logEntry.count(),
     ]);
 
-    const ids = trendingGroups.map((g) => g.gameId);
     const trendingRows = await this.prisma.game.findMany({ where: { id: { in: ids } }, select: gameSummarySelect });
     let trending = ids.map((id) => trendingRows.find((g) => g.id === id)!).filter(Boolean);
-    if (trending.length < 12) {
+    if (trending.length < TRENDING_SIZE) {
       const filler = await this.prisma.game.findMany({
         where: { id: { notIn: ids } },
-        orderBy: { playerCount: 'desc' },
-        take: 12 - trending.length,
+        orderBy: [{ playerCount: 'desc' }, { title: 'asc' }], // desempate fixo: a ordem não muda entre visitas
+        take: TRENDING_SIZE - trending.length,
         select: gameSummarySelect,
       });
       trending = [...trending, ...filler];
@@ -323,6 +321,36 @@ export class GamesService {
       friends: friends.map(toLogView),
       totals: { games, users, logs },
     };
+  }
+
+  /**
+   * "Em alta": jogos registrados no diário nos últimos TRENDING_DAYS dias.
+   * - Cada pessoa conta uma vez por jogo (vários registros da mesma pessoa não inflam o jogo).
+   * - Pesa pelo tempo de jogo dela no jogo (horas da estante; sem elas, o maior valor dos registros):
+   *   1 + log10(1 + horas), no máximo TRENDING_MAX_WEIGHT. 0 h → 1; 1 h → 1,3; 10 h → 2; 100 h+ → 3.
+   *   Logarítmico para quem jogou mais pesar mais sem que uma pessoa com centenas de horas decida
+   *   o ranking sozinha (na base atual: mediana 21 h, máximo 282 h).
+   * - Desempate fixo: nº de pessoas, jogado mais recentemente, playerCount, título.
+   */
+  private async trendingIds(since: Date): Promise<string[]> {
+    const rows = await this.prisma.$queryRaw<{ gameId: string }[]>`
+      WITH per_person AS (
+        SELECT l."gameId", l."userId", MAX(l."playedOn") AS last_played,
+               COALESCE(MAX(ug."hoursPlayed"), MAX(l."hours"), 0) AS hours
+        FROM "LogEntry" l
+        LEFT JOIN "UserGame" ug ON ug."userId" = l."userId" AND ug."gameId" = l."gameId"
+        WHERE l."playedOn" >= ${since}
+        GROUP BY l."gameId", l."userId"
+      )
+      SELECT p."gameId"
+      FROM per_person p
+      JOIN "Game" g ON g."id" = p."gameId"
+      GROUP BY p."gameId", g."playerCount", g."title"
+      ORDER BY SUM(LEAST(1 + LOG(1 + GREATEST(p.hours, 0)), ${TRENDING_MAX_WEIGHT})) DESC,
+               COUNT(*) DESC, MAX(p.last_played) DESC, g."playerCount" DESC, g."title" ASC
+      LIMIT ${TRENDING_SIZE}
+    `;
+    return rows.map((r) => r.gameId);
   }
 
   async searchLite(q: string): Promise<GameSummary[]> {
