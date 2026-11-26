@@ -1,14 +1,23 @@
 'use client';
 
-import type { GameSummary, Platform, UserGameState } from '@savepoint/shared';
+import {
+  PLAY_STATUS_LABEL,
+  type GameSummary,
+  type Platform,
+  type SaveSummary,
+  type UserGameState,
+  type ViewerSave,
+} from '@savepoint/shared';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { createLogAction } from '@/app/actions';
 import { today } from '@/lib/format';
 import { GameCover } from './GameCover';
 import { Icon } from './Icon';
-import { StarInput } from './StarInput';
 
-/** Modal "Registrar no diário" — o coração do app (equivalente ao "Log" do Letterboxd). */
+/**
+ * Modal "Novo checkpoint": registra uma sessão/anotação no save atual (o diário de jornada).
+ * Não tem nota nem review: a avaliação é do save, quando ele fecha (zerou/abandonou).
+ */
 export function LogDialog({
   open,
   onClose,
@@ -16,18 +25,17 @@ export function LogDialog({
   game,
   platforms,
   defaults,
+  save = null,
 }: {
   open: boolean;
   onClose: () => void;
-  onSaved: (patch: Partial<UserGameState>) => void;
+  onSaved: (patch: Partial<UserGameState>, save: SaveSummary) => void;
   game: GameSummary;
   platforms: Platform[];
   defaults: UserGameState;
+  save?: ViewerSave | null;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
-  // Sem nota própria, abre com a sugerida (Steam) já marcada: o usuário só ajusta se quiser.
-  const [rating, setRating] = useState<number | null>(defaults.rating ?? defaults.suggested?.rating ?? null);
-  const [liked, setLiked] = useState(defaults.liked);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -35,56 +43,47 @@ export function LogDialog({
     const d = ref.current;
     if (!d) return;
     if (open && !d.open) {
-      setRating(defaults.rating ?? defaults.suggested?.rating ?? null);
-      setLiked(defaults.liked);
       setError(null);
       d.showModal();
     }
     if (!open && d.open) d.close();
-  }, [open, defaults.rating, defaults.suggested?.rating, defaults.liked]);
+  }, [open]);
 
   function submit(form: FormData) {
     const hours = form.get('hours');
-    const finished = form.get('finished') === 'on';
     const platformId = String(form.get('platformId') || '') || null;
     const input = {
       gameId: game.id,
       playedOn: String(form.get('playedOn')),
       platformId,
       hours: hours ? Number(hours) : null,
-      finished,
-      replay: form.get('replay') === 'on',
-      rating,
-      liked,
-      review: String(form.get('review') ?? '').trim() || null,
+      note: String(form.get('note') ?? '').trim() || null,
       spoiler: form.get('spoiler') === 'on',
+      isPublic: form.get('isPublic') === 'on',
     };
     setError(null);
     start(async () => {
       const res = await createLogAction(input, game.slug);
       if (!res.ok) return setError(res.error);
       onSaved({
-        ...(rating ? { rating } : {}),
-        ...(liked ? { liked } : {}),
         ...(platformId ? { platformId } : {}),
         ...(input.hours != null ? { hoursPlayed: input.hours } : {}),
-        status: finished
-          ? defaults.status === 'MASTERED'
-            ? 'MASTERED'
-            : 'COMPLETED'
-          : !defaults.status || defaults.status === 'BACKLOG'
-            ? 'PLAYING'
-            : defaults.status,
-      });
+        // Sem status (ou só "Quero jogar"), registrar abre o save: passa a "Jogando".
+        status: !defaults.status || defaults.status === 'BACKLOG' ? 'PLAYING' : defaults.status,
+      }, res.data.save);
       onClose();
     });
   }
+
+  const saveLabel = save
+    ? `Save ${save.number} · ${PLAY_STATUS_LABEL[save.status]}`
+    : 'Começa o Save 1 deste jogo';
 
   return (
     <dialog ref={ref} className="dialog" onClose={onClose} aria-labelledby="log-title">
       <form action={submit}>
         <div className="dialog-head">
-          <h2 id="log-title">Registrar no diário</h2>
+          <h2 id="log-title">Novo checkpoint</h2>
           <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Fechar">
             <Icon name="x" size={16} />
           </button>
@@ -96,7 +95,9 @@ export function LogDialog({
           <div className="dialog-fields">
             <div>
               <h3 style={{ fontSize: 22 }}>{game.title}</h3>
-              {game.releaseYear && <span className="muted">{game.releaseYear}</span>}
+              <span className="save-chip">
+                <Icon name="save" size={12} /> {saveLabel}
+              </span>
             </div>
             <div className="inline">
               <label className="field">
@@ -119,21 +120,26 @@ export function LogDialog({
                 <input className="input" type="number" name="hours" min={0} step="0.5" defaultValue={defaults.hoursPlayed ?? ''} />
               </label>
             </div>
+            <label className="field">
+              <span>Anotação</span>
+              <textarea
+                className="textarea"
+                name="note"
+                placeholder="Como foi a sessão? Onde parou, o que achou até aqui… (opcional)"
+                maxLength={4000}
+              />
+            </label>
             <div className="inline">
               <label className="check">
-                <input type="checkbox" name="finished" defaultChecked={defaults.status === 'COMPLETED'} /> Zerei
+                <input type="checkbox" name="spoiler" /> Contém spoilers
               </label>
-              <label className="check">
-                <input type="checkbox" name="replay" /> Estou rejogando
+              <label className="check" title="Checkpoints privados só aparecem para você">
+                <input type="checkbox" name="isPublic" defaultChecked /> Público
               </label>
             </div>
-            <label className="field">
-              <span>Review</span>
-              <textarea className="textarea" name="review" placeholder="Escreva o que achou… (opcional)" maxLength={8000} />
-            </label>
-            <label className="check">
-              <input type="checkbox" name="spoiler" /> Contém spoilers
-            </label>
+            <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+              A nota e a review ficam para quando você zerar ou abandonar o jogo.
+            </p>
           </div>
         </div>
         {error && (
@@ -141,15 +147,9 @@ export function LogDialog({
             {error}
           </div>
         )}
-        <div className="dialog-foot">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-            <StarInput value={rating} onChange={setRating} size={24} />
-            <button type="button" className={`icon-toggle like ${liked ? 'on' : ''}`} onClick={() => setLiked(!liked)} aria-pressed={liked}>
-              <Icon name="heart" size={22} fill={liked} />
-            </button>
-          </div>
+        <div className="dialog-foot" style={{ justifyContent: 'flex-end' }}>
           <button type="submit" className="btn btn-primary" disabled={pending}>
-            {pending ? 'Salvando…' : 'Salvar'}
+            {pending ? 'Salvando…' : 'Salvar checkpoint'}
           </button>
         </div>
       </form>

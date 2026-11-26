@@ -1,18 +1,18 @@
-import type { LogView } from '@savepoint/shared';
+import { PLAY_STATUS_LABEL, type ReviewView } from '@savepoint/shared';
 import Link from 'next/link';
 import { shortDate } from '@/lib/format';
 import { Poster, Stars, UserLink } from './bits';
-import { Icon } from './Icon';
+import { Icon, STATUS_COLOR, STATUS_ICON } from './Icon';
 import { LikeButton } from './LikeButton';
 import { ReviewThread } from './ReviewThread';
 
-/** Card de review — usado na home, na página do jogo e no perfil. */
+/** Card de review (avaliação de um save) — usado na home, na página do jogo e no perfil. */
 export function Review({
   log,
   showGame = true,
   canLike,
 }: {
-  log: LogView;
+  log: ReviewView;
   showGame?: boolean;
   canLike: boolean;
 }) {
@@ -30,14 +30,12 @@ export function Review({
           <UserLink user={log.user} />
           <Stars rating={log.rating} />
           {log.liked && <Icon name="heart" size={13} fill className="heart" />}
-          {log.replay && (
-            <span className="tag">
-              <Icon name="replay" size={12} /> Rejogou
-            </span>
-          )}
-          {log.finished && !log.replay && (
-            <span className="tag" style={{ color: 'var(--st-completed)' }}>
-              <Icon name="check" size={12} /> Zerou
+          <span className="tag" style={{ color: STATUS_COLOR[log.save.status] }}>
+            <Icon name={STATUS_ICON[log.save.status]} size={12} /> {PLAY_STATUS_LABEL[log.save.status]}
+          </span>
+          {log.save.number > 1 && (
+            <span className="tag" title="Rejogou: esta é a avaliação de uma nova jornada">
+              <Icon name="save" size={12} /> Save {log.save.number}
             </span>
           )}
         </div>
@@ -53,7 +51,7 @@ export function Review({
         <ReviewThread logId={log.id} initialCount={log.commentCount} canReply={canLike}>
           <LikeButton logId={log.id} initialLiked={log.viewerLiked} initialCount={log.likeCount} enabled={canLike} />
           <span className="foot-meta">
-            {shortDate(log.playedOn)}
+            {shortDate(log.save.endedAt ?? log.createdAt)}
             {log.platform && ` · ${log.platform}`}
             {log.hours != null && ` · ${Math.round(log.hours)}h`}
           </span>

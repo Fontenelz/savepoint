@@ -1,19 +1,23 @@
 'use client';
 
 import {
+  CLOSED_STATUSES,
   PLAY_STATUSES,
   PLAY_STATUS_LABEL,
+  canRate,
   type GameSummary,
   type LibraryEntryInput,
   type Platform,
   type PlayStatus,
   type UserGameState,
+  type ViewerSave,
 } from '@savepoint/shared';
 import Link from 'next/link';
 import { useEffect, useState, useTransition, type CSSProperties, type ReactNode } from 'react';
-import { addToListAction, removeFromLibraryAction, saveLibraryAction, toggleFavoriteAction } from '@/app/actions';
+import { addToListAction, removeFromLibraryAction, replayAction, saveLibraryAction, toggleFavoriteAction } from '@/app/actions';
 import { Icon, STATUS_COLOR, STATUS_ICON } from './Icon';
 import { LogDialog } from './LogDialog';
+import { SaveReviewDialog } from './SaveReviewDialog';
 import { StarInput } from './StarInput';
 
 const EMPTY: UserGameState = {
@@ -30,7 +34,10 @@ const EMPTY: UserGameState = {
 
 const OPEN_LOG_EVENT = 'sp:open-log';
 
-/** Abre o diálogo de registro/review do painel de ações a partir de outro ponto da página. */
+/**
+ * Abre, a partir de outro ponto da página, o diálogo do painel: a avaliação se o save atual
+ * pode ser avaliado (zerado/abandonado/sem fim); senão, um novo checkpoint.
+ */
 export function OpenLogButton({ children }: { children: ReactNode }) {
   return (
     <button type="button" className="btn btn-sm" onClick={() => window.dispatchEvent(new Event(OPEN_LOG_EVENT))}>
@@ -46,25 +53,30 @@ export function GameActions({
   initial,
   loggedIn,
   myLists,
+  initialSave = null,
 }: {
   game: GameSummary;
   platforms: Platform[];
   initial: UserGameState | null;
   loggedIn: boolean;
   myLists: { id: string; title: string }[];
+  initialSave?: ViewerSave | null;
 }) {
   const [state, setState] = useState<UserGameState>(initial ?? EMPTY);
+  const [current, setCurrent] = useState<ViewerSave | null>(initialSave);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [logOpen, setLogOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
   const [pending, start] = useTransition();
 
+  const rateable = canRate(current?.status ?? null);
   useEffect(() => {
-    const open = () => setLogOpen(true);
+    const open = () => (rateable ? setReviewOpen(true) : setLogOpen(true));
     window.addEventListener(OPEN_LOG_EVENT, open);
     return () => window.removeEventListener(OPEN_LOG_EVENT, open);
-  }, []);
+  }, [rateable]);
 
   if (!loggedIn) {
     return (
@@ -86,11 +98,29 @@ export function GameActions({
     setNotice(null);
     start(async () => {
       const res = await saveLibraryAction(game.id, game.slug, patch);
-      if (res.ok) setState(res.data);
-      else {
+      if (res.ok) {
+        const { save: next, ...rest } = res.data;
+        setState(rest);
+        if (next !== undefined) setCurrent(next);
+        // Fechou o save agora (zerou/100%/abandonou): abre "Fechar save" para nota e review.
+        const closedNow = patch.status && CLOSED_STATUSES.includes(patch.status) && !CLOSED_STATUSES.includes(prev.status as PlayStatus);
+        if (closedNow && next) setReviewOpen(true);
+      } else {
         setState(prev);
         setError(res.error);
       }
+    });
+  }
+
+  function replay() {
+    if (!confirm(`Começar o Save ${(current?.number ?? 0) + 1}? O save atual fica guardado no seu diário.`)) return;
+    setError(null);
+    start(async () => {
+      const res = await replayAction(game.id, game.slug);
+      if (!res.ok) return setError(res.error);
+      setCurrent(res.data);
+      setState((s) => ({ ...s, status: 'PLAYING', finishedAt: null }));
+      setNotice(`Save ${res.data.number} começou ✓`);
     });
   }
 
@@ -162,7 +192,17 @@ export function GameActions({
             <div className="label" style={{ marginBottom: 4 }}>
               {state.rating ? 'Sua nota' : suggested ? 'Nota sugerida' : 'Avaliar'}
             </div>
-            <StarInput value={state.rating} suggested={suggested?.rating} onChange={(rating) => save({ rating })} />
+            <StarInput
+              value={state.rating}
+              suggested={suggested?.rating}
+              disabled={!canRate(state.status)}
+              onChange={(rating) => save({ rating })}
+            />
+            {!canRate(state.status) && (
+              <div className="rate-locked">
+                <Icon name="lock" size={11} /> Avalie quando zerar ou abandonar
+              </div>
+            )}
             {suggested && (
               <div className="suggested-note">
                 <span title="Calculada a partir das avaliações da loja da Steam">Steam: {suggested.steamScore}% positivas</span>
@@ -232,6 +272,26 @@ export function GameActions({
         </div>
       ) : null}
 
+      {current && (
+        <div className="actions-block save-panel">
+          <span className="save-chip" title={current.startedAt ? `Começou em ${current.startedAt}` : undefined}>
+            <Icon name="save" size={12} /> Save {current.number} · {PLAY_STATUS_LABEL[current.status]}
+          </span>
+          <span style={{ display: 'flex', gap: 6 }}>
+            {rateable && (
+              <button type="button" className="btn btn-sm" onClick={() => setReviewOpen(true)}>
+                <Icon name="star" size={13} /> {current.rating != null || current.review ? 'Editar avaliação' : 'Avaliar'}
+              </button>
+            )}
+            {CLOSED_STATUSES.includes(current.status) && (
+              <button type="button" className="btn btn-sm" onClick={replay}>
+                <Icon name="replay" size={13} /> Rejogar
+              </button>
+            )}
+          </span>
+        </div>
+      )}
+
       {error && <div className="actions-msg">{error}</div>}
       {notice && (
         <div className="actions-msg" style={{ color: 'var(--accent)', background: 'var(--accent-soft)' }}>
@@ -241,7 +301,7 @@ export function GameActions({
 
       <div className="actions-block">
         <button type="button" className="btn btn-primary btn-block" onClick={() => setLogOpen(true)}>
-          <Icon name="edit" size={15} /> Registrar ou escrever review
+          <Icon name="flag" size={15} /> Novo checkpoint
         </button>
       </div>
       <button type="button" className="actions-link" onClick={() => setListOpen((v) => !v)} aria-expanded={listOpen}>
@@ -283,11 +343,34 @@ export function GameActions({
       <LogDialog
         open={logOpen}
         onClose={() => setLogOpen(false)}
-        onSaved={(patch) => setState((s) => ({ ...s, ...patch }))}
+        onSaved={(patch, saved) => {
+          setState((s) => ({ ...s, ...patch }));
+          // O primeiro checkpoint abre o Save 1.
+          setCurrent((c) =>
+            c?.id === saved.id
+              ? { ...c, checkpointCount: c.checkpointCount + 1 }
+              : { ...saved, review: null, spoiler: false, liked: false, checkpointCount: 1 },
+          );
+        }}
         game={game}
         platforms={platforms}
         defaults={state}
+        save={current}
       />
+      {current && rateable && (
+        <SaveReviewDialog
+          open={reviewOpen}
+          onClose={() => setReviewOpen(false)}
+          onSaved={(next, officialRating, liked) => {
+            setCurrent(next);
+            setState((s) => ({ ...s, rating: officialRating, liked: s.liked || liked }));
+          }}
+          game={game}
+          save={current}
+          officialRating={state.rating}
+          suggestedRating={state.suggested?.rating}
+        />
+      )}
     </div>
   );
 }

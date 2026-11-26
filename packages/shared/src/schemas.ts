@@ -46,19 +46,32 @@ export const libraryEntrySchema = z.object({
 });
 export type LibraryEntryInput = z.infer<typeof libraryEntrySchema>;
 
-export const logEntrySchema = z.object({
+/** Checkpoint do diário: sessão/anotação dentro do save atual. Sem nota nem review. */
+export const checkpointSchema = z.object({
   gameId: z.string().min(1),
   playedOn: pastDate,
   platformId: z.string().nullable().optional(),
+  /** Total de horas no jogo até aqui. */
   hours: z.number().min(0).max(100000).nullable().optional(),
-  finished: z.boolean().default(false),
-  replay: z.boolean().default(false),
-  rating: rating.nullable().optional(),
-  liked: z.boolean().default(false),
+  note: z.string().trim().max(4000).nullable().optional(),
+  spoiler: z.boolean().default(false),
+  isPublic: z.boolean().default(true),
+});
+export type CheckpointInput = z.input<typeof checkpointSchema>;
+
+/** Avaliação de um save fechado (ou "Sem fim"): nota + review. */
+export const saveReviewSchema = z.object({
+  rating: rating.nullable(),
   review: z.string().trim().max(8000).nullable().optional(),
   spoiler: z.boolean().default(false),
+  liked: z.boolean().default(false),
+  /** Usar a nota deste save como a nota oficial do jogo (a que entra na média). */
+  official: z.boolean().default(true),
 });
-export type LogEntryInput = z.input<typeof logEntrySchema>;
+export type SaveReviewInput = z.input<typeof saveReviewSchema>;
+
+/** Rejogar: abre um save novo. */
+export const replaySchema = z.object({ gameId: z.string().min(1) });
 
 export const listSchema = z.object({
   title: z.string().trim().min(1, 'Dê um nome à lista').max(80),

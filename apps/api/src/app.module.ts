@@ -7,6 +7,7 @@ import { GamesModule } from './games/games.module';
 import { LibraryModule } from './library/library.module';
 import { ListsModule } from './lists/lists.module';
 import { LogsModule } from './logs/logs.module';
+import { SavesModule } from './saves/saves.module';
 import { SteamModule } from './steam/steam.module';
 import { UsersModule } from './users/users.module';
 
@@ -26,6 +27,7 @@ class HealthController {
     GamesModule,
     LibraryModule,
     LogsModule,
+    SavesModule,
     ListsModule,
     UsersModule,
     CatalogModule,

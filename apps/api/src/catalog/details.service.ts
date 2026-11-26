@@ -220,6 +220,7 @@ export class CatalogDetailsService {
       // Estante e diário guardam a plataforma em que a pessoa jogou: aponta para a canônica.
       await this.prisma.userGame.updateMany({ where: { platformId: p.id }, data: { platformId: into.id } });
       await this.prisma.logEntry.updateMany({ where: { platformId: p.id }, data: { platformId: into.id } });
+      await this.prisma.save.updateMany({ where: { platformId: p.id }, data: { platformId: into.id } });
       await this.prisma.platform.delete({ where: { id: p.id } });
       merged.push(`${p.name} → ${target.name} (${games.length})`);
     }

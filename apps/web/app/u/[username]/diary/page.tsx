@@ -1,12 +1,13 @@
-import type { LogView, Paginated } from '@savepoint/shared';
+import type { CheckpointView, Paginated } from '@savepoint/shared';
 import Link from 'next/link';
 import { Empty, Pagination, Stars } from '@/components/bits';
 import { GameCover } from '@/components/GameCover';
 import { Icon } from '@/components/Icon';
 import { api } from '@/lib/api';
 import { monthLabel } from '@/lib/format';
+import { checkpointLabel, checkpointRating } from '@/lib/journey';
 
-/** Diário no estilo "tabela por mês": cada linha é um registro, agrupado pelo mês em que foi jogado. */
+/** Diário no estilo "tabela por mês": cada linha é um checkpoint, agrupado pelo mês em que foi jogado. */
 export default async function DiaryPage({
   params,
   searchParams,
@@ -16,13 +17,13 @@ export default async function DiaryPage({
 }) {
   const { username } = await params;
   const { page = '1' } = await searchParams;
-  const data = await api<Paginated<LogView>>(`/users/${encodeURIComponent(username)}/diary?page=${page}`);
+  const data = await api<Paginated<CheckpointView>>(`/users/${encodeURIComponent(username)}/diary?page=${page}`);
 
   if (data.items.length === 0) {
     return (
       <div className="section">
         <Empty title="Diário vazio">
-          <p>Abra a página de um jogo e use “Registrar no diário”.</p>
+          <p>Abra a página de um jogo e use “Novo checkpoint”.</p>
         </Empty>
       </div>
     );
@@ -37,7 +38,7 @@ export default async function DiaryPage({
             <th className="c-day">Dia</th>
             <th className="thumb" />
             <th>Jogo</th>
-            <th className="c-rating">Nota</th>
+            <th className="c-rating">Checkpoint</th>
             <th className="hide-sm">Plataforma</th>
             <th className="hide-sm">Horas</th>
             <th className="c-icons" />
@@ -67,18 +68,32 @@ export default async function DiaryPage({
                 <td className="title">
                   <Link href={`/games/${log.game.slug}`}>{log.game.title}</Link>
                   {log.game.releaseYear && <small>{log.game.releaseYear}</small>}
+                  {log.note &&
+                    (log.spoiler ? (
+                      <span className="diary-note muted">Anotação com spoiler</span>
+                    ) : (
+                      <span className="diary-note muted">{log.note}</span>
+                    ))}
                 </td>
                 <td>
-                  <Stars rating={log.rating} />
+                  <span className="diary-kind">
+                    {checkpointLabel(log)}
+                    {log.save.number > 1 && log.kind !== 'STARTED' && <small> · Save {log.save.number}</small>}
+                  </span>
+                  <Stars rating={checkpointRating(log)} />
                 </td>
                 <td className="hide-sm muted">{log.platform ?? '—'}</td>
                 <td className="hide-sm mono muted">{log.hours != null ? `${Math.round(log.hours)}h` : '—'}</td>
                 <td>
                   <span className="icons">
-                    {log.liked && <Icon name="heart" size={14} fill className="heart" />}
-                    {log.finished && <Icon name="check" size={14} className="" />}
-                    {log.replay && <Icon name="replay" size={14} />}
-                    {log.review && <Icon name="text" size={14} />}
+                    {log.kind === 'CLOSED' && <Icon name="check" size={14} />}
+                    {log.kind === 'STARTED' && log.save.number > 1 && <Icon name="replay" size={14} />}
+                    {log.note && <Icon name="text" size={14} />}
+                    {!log.isPublic && (
+                      <span title="Privado: só você vê">
+                        <Icon name="lock" size={14} />
+                      </span>
+                    )}
                   </span>
                 </td>
               </tr>

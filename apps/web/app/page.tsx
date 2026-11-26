@@ -1,4 +1,5 @@
-import { PLAY_STATUS_VERB, type HomeData, type QueueData } from '@savepoint/shared';
+import type { HomeData, QueueData } from '@savepoint/shared';
+import { checkpointRating, checkpointVerb } from '@/lib/journey';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Avatar, CoverWall, ListCard, Poster, SectionHead, Stars } from '@/components/bits';
@@ -93,13 +94,12 @@ export default async function HomePage() {
             <div className="row-posters">
               {friends.slice(0, 6).map((log) => (
                 <Poster key={log.id} game={log.game}>
-                  <Link href={`/u/${log.user.username}`} title={`${log.user.displayName} ${log.finished ? 'zerou' : PLAY_STATUS_VERB.PLAYING}`}>
+                  <Link href={`/u/${log.user.username}`} title={`${log.user.displayName} ${checkpointVerb(log)} ${log.game.title}`}>
                     <Avatar user={log.user} size={18} />
                   </Link>
                   <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                    <Stars rating={log.rating} />
-                    {log.liked && <Icon name="heart" size={11} fill className="heart" />}
-                    {log.review && <Icon name="text" size={11} />}
+                    <Stars rating={checkpointRating(log)} />
+                    {log.note && <Icon name="text" size={11} />}
                   </span>
                 </Poster>
               ))}

@@ -16,16 +16,20 @@ import {
 import {
   gameSummarySelect,
   listSummarySelect,
-  logSelect,
+  checkpointSelect,
+  hasReview,
+  reviewSelect,
   paged,
   paginate,
   toGameSummary,
   toListSummary,
-  toLogView,
+  toCheckpointView,
+  toReviewView,
   toUserGameState,
   userGameStateSelect,
   userSummarySelect,
 } from '../core/mappers';
+import { JourneyService } from '../core/journey.service';
 import { PrismaService } from '../core/prisma.service';
 
 /** Top "em alta" da home (ver trendingIds). 12 = Top 10 + mural de capas. */
@@ -39,7 +43,10 @@ const PAGE_SIZE = 42;
 
 @Injectable()
 export class GamesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly journey: JourneyService,
+  ) {}
 
   async list(query: GameQuery): Promise<Paginated<GameSummary>> {
     const where: Prisma.GameWhereInput = {
@@ -98,8 +105,8 @@ export class GamesService {
     });
     if (!game) throw new NotFoundException('Jogo não encontrado');
 
-    const reviewWhere = { gameId: game.id, review: { not: null } };
-    const [ratingGroups, statusGroups, hours, listCount, logCount, popular, recent, lists, viewer, friends, similar] =
+    const reviewWhere = { gameId: game.id, ...hasReview };
+    const [ratingGroups, statusGroups, hours, listCount, logCount, popular, recent, lists, viewer, friends, similar, viewerSave] =
       await Promise.all([
         this.prisma.userGame.groupBy({
           by: ['rating'],
@@ -116,18 +123,21 @@ export class GamesService {
           _avg: { hoursPlayed: true },
         }),
         this.prisma.listItem.count({ where: { gameId: game.id } }),
-        this.prisma.logEntry.count({ where: { gameId: game.id } }),
-        this.prisma.logEntry.findMany({
+        this.prisma.logEntry.count({ where: { gameId: game.id, isPublic: true } }),
+        // Uma review por pessoa: ninguém ocupa a seção sozinho (vale a mais curtida/mais recente).
+        this.prisma.save.findMany({
           where: reviewWhere,
-          orderBy: [{ likes: { _count: 'desc' } }, { createdAt: 'desc' }],
+          orderBy: [{ likes: { _count: 'desc' } }, { reviewedAt: 'desc' }],
+          distinct: ['userId'],
           take: 4,
-          select: logSelect(viewerId),
+          select: reviewSelect(viewerId),
         }),
-        this.prisma.logEntry.findMany({
+        this.prisma.save.findMany({
           where: reviewWhere,
-          orderBy: { createdAt: 'desc' },
+          orderBy: { reviewedAt: 'desc' },
+          distinct: ['userId'],
           take: 6,
-          select: logSelect(viewerId),
+          select: reviewSelect(viewerId),
         }),
         this.prisma.gameList.findMany({
           where: { items: { some: { gameId: game.id } } },
@@ -154,6 +164,7 @@ export class GamesService {
           game.genres.map((g) => g.id),
           game.platforms.map((p) => p.id),
         ),
+        viewerId ? this.journey.viewerSave(viewerId, game.id) : null,
       ]);
 
     const histogram = Array.from({ length: 10 }, () => 0);
@@ -188,8 +199,9 @@ export class GamesService {
         communityHours: hours._avg.hoursPlayed,
       },
       viewer: viewer ? toUserGameState(viewer) : null,
-      popularReviews: popular.map(toLogView),
-      recentReviews: recent.filter((r) => !popularIds.has(r.id)).map(toLogView),
+      viewerSave,
+      popularReviews: popular.map(toReviewView),
+      recentReviews: recent.filter((r) => !popularIds.has(r.id)).map(toReviewView),
       lists: lists.map(toListSummary),
       friends,
       similar,
@@ -273,17 +285,17 @@ export class GamesService {
 
     const [ids, recentReviews, popularReviews, lists, friends, games, users, logs] = await Promise.all([
       this.trendingIds(since),
-      this.prisma.logEntry.findMany({
-        where: { review: { not: null }, spoiler: false },
-        orderBy: { createdAt: 'desc' },
+      this.prisma.save.findMany({
+        where: { ...hasReview, spoiler: false },
+        orderBy: { reviewedAt: 'desc' },
         take: 6,
-        select: logSelect(viewerId),
+        select: reviewSelect(viewerId),
       }),
-      this.prisma.logEntry.findMany({
-        where: { review: { not: null }, createdAt: { gte: since } },
-        orderBy: [{ likes: { _count: 'desc' } }, { createdAt: 'desc' }],
+      this.prisma.save.findMany({
+        where: { ...hasReview, reviewedAt: { gte: since } },
+        orderBy: [{ likes: { _count: 'desc' } }, { reviewedAt: 'desc' }],
         take: 6,
-        select: logSelect(viewerId),
+        select: reviewSelect(viewerId),
       }),
       this.prisma.gameList.findMany({
         orderBy: [{ items: { _count: 'desc' } }, { updatedAt: 'desc' }],
@@ -292,10 +304,10 @@ export class GamesService {
       }),
       viewerId
         ? this.prisma.logEntry.findMany({
-            where: { user: { followers: { some: { followerId: viewerId } } } },
+            where: { isPublic: true, user: { followers: { some: { followerId: viewerId } } } },
             orderBy: [{ playedOn: 'desc' }, { createdAt: 'desc' }],
             take: 30, // o front remove jogos repetidos e mostra 6
-            select: logSelect(viewerId),
+            select: checkpointSelect,
           })
         : [],
       this.prisma.game.count(),
@@ -318,10 +330,10 @@ export class GamesService {
     const popularIds = new Set(popularReviews.map((r) => r.id));
     return {
       trending: trending.map(toGameSummary),
-      popularReviews: popularReviews.map(toLogView),
-      recentReviews: recentReviews.filter((r) => !popularIds.has(r.id)).map(toLogView),
+      popularReviews: popularReviews.map(toReviewView),
+      recentReviews: recentReviews.filter((r) => !popularIds.has(r.id)).map(toReviewView),
       lists: lists.map(toListSummary),
-      friends: friends.map(toLogView),
+      friends: friends.map(toCheckpointView),
       totals: { games, users, logs },
     };
   }

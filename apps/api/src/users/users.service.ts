@@ -7,7 +7,8 @@ import {
   type LibraryItem,
   type LibraryQuery,
   type ListSummary,
-  type LogView,
+  type CheckpointView,
+  type ReviewView,
   type Paginated,
   type PlayStatus,
   type Profile,
@@ -18,12 +19,16 @@ import {
 import {
   gameSummarySelect,
   listSummarySelect,
-  logSelect,
+  checkpointSelect,
+  hasReview,
+  reviewSelect,
   paged,
   paginate,
   toGameSummary,
   toListSummary,
-  toLogView,
+  toCheckpointView,
+  toReviewView,
+  visibleCheckpoints,
   toUserGameState,
   userGameStateSelect,
   userSummarySelect,
@@ -75,7 +80,7 @@ export class UsersService {
           _count: { _all: true },
         }),
         this.prisma.userGame.aggregate({ where: { userId: user.id }, _sum: { hoursPlayed: true } }),
-        this.prisma.logEntry.count({ where: { userId: user.id, review: { not: null } } }),
+        this.prisma.save.count({ where: { userId: user.id, ...hasReview } }),
         this.prisma.logEntry.groupBy({ by: ['gameId'], where: { userId: user.id, playedOn: { gte: yearStart } } }),
         this.prisma.userGame.findMany({
           where: { userId: user.id, favoriteRank: { not: null } },
@@ -83,16 +88,17 @@ export class UsersService {
           select: { game: { select: gameSummarySelect } },
         }),
         this.prisma.logEntry.findMany({
-          where: { userId: user.id },
+          where: { userId: user.id, ...visibleCheckpoints(viewerId) },
           orderBy: [{ playedOn: 'desc' }, { createdAt: 'desc' }],
+          distinct: ['gameId'], // um card por jogo (o checkpoint mais recente); o histórico fica no diário
           take: 18, // carrossel "Atividade recente"
-          select: logSelect(viewerId),
+          select: checkpointSelect,
         }),
-        this.prisma.logEntry.findMany({
-          where: { userId: user.id, review: { not: null } },
-          orderBy: { createdAt: 'desc' },
+        this.prisma.save.findMany({
+          where: { userId: user.id, ...hasReview },
+          orderBy: { reviewedAt: 'desc' },
           take: 3,
-          select: logSelect(viewerId),
+          select: reviewSelect(viewerId),
         }),
         this.prisma.userGame.findMany({
           where: { userId: user.id, status: 'PLAYING' },
@@ -156,8 +162,8 @@ export class UsersService {
       histogram,
       topGenres: tally(played.flatMap((p) => p.game.genres.map((g) => g.name))),
       topPlatforms: tally(played.flatMap((p) => (p.platform ? [p.platform.name] : []))),
-      recentLogs: recentLogs.map(toLogView),
-      recentReviews: recentReviews.map(toLogView),
+      recentLogs: recentLogs.map(toCheckpointView),
+      recentReviews: recentReviews.map(toReviewView),
       currentlyPlaying: playing.map((p) => toGameSummary(p.game)),
     };
   }
@@ -219,35 +225,38 @@ export class UsersService {
     return { playing: playing.map(toItem), backlog: backlog.map(toItem) };
   }
 
-  async diary(username: string, page: number, viewerId?: string): Promise<Paginated<LogView>> {
+  /** Diário: checkpoints (privados só para o dono). */
+  async diary(username: string, page: number, viewerId?: string): Promise<Paginated<CheckpointView>> {
     const userId = await this.findId(username);
     const pageSize = 50;
-    const [rows, total] = await Promise.all([
-      this.prisma.logEntry.findMany({
-        where: { userId },
-        orderBy: [{ playedOn: 'desc' }, { createdAt: 'desc' }],
-        select: logSelect(viewerId),
-        ...paginate(page, pageSize),
-      }),
-      this.prisma.logEntry.count({ where: { userId } }),
-    ]);
-    return paged(rows.map(toLogView), total, page, pageSize);
-  }
-
-  async reviews(username: string, page: number, viewerId?: string): Promise<Paginated<LogView>> {
-    const userId = await this.findId(username);
-    const pageSize = 20;
-    const where = { userId, review: { not: null } };
+    const where: Prisma.LogEntryWhereInput = { userId, ...visibleCheckpoints(viewerId) };
     const [rows, total] = await Promise.all([
       this.prisma.logEntry.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
-        select: logSelect(viewerId),
+        orderBy: [{ playedOn: 'desc' }, { createdAt: 'desc' }],
+        select: checkpointSelect,
         ...paginate(page, pageSize),
       }),
       this.prisma.logEntry.count({ where }),
     ]);
-    return paged(rows.map(toLogView), total, page, pageSize);
+    return paged(rows.map(toCheckpointView), total, page, pageSize);
+  }
+
+  /** Reviews: avaliações dos saves. */
+  async reviews(username: string, page: number, viewerId?: string): Promise<Paginated<ReviewView>> {
+    const userId = await this.findId(username);
+    const pageSize = 20;
+    const where = { userId, ...hasReview };
+    const [rows, total] = await Promise.all([
+      this.prisma.save.findMany({
+        where,
+        orderBy: { reviewedAt: 'desc' },
+        select: reviewSelect(viewerId),
+        ...paginate(page, pageSize),
+      }),
+      this.prisma.save.count({ where }),
+    ]);
+    return paged(rows.map(toReviewView), total, page, pageSize);
   }
 
   async lists(username: string): Promise<ListSummary[]> {
@@ -272,19 +281,20 @@ export class UsersService {
     return { following: follow };
   }
 
-  async feed(viewerId: string, page: number): Promise<Paginated<LogView>> {
+  /** Atividade de quem a pessoa segue: checkpoints públicos. */
+  async feed(viewerId: string, page: number): Promise<Paginated<CheckpointView>> {
     const pageSize = 30;
-    const where: Prisma.LogEntryWhereInput = { user: { followers: { some: { followerId: viewerId } } } };
+    const where: Prisma.LogEntryWhereInput = { isPublic: true, user: { followers: { some: { followerId: viewerId } } } };
     const [rows, total] = await Promise.all([
       this.prisma.logEntry.findMany({
         where,
         orderBy: [{ playedOn: 'desc' }, { createdAt: 'desc' }],
-        select: logSelect(viewerId),
+        select: checkpointSelect,
         ...paginate(page, pageSize),
       }),
       this.prisma.logEntry.count({ where }),
     ]);
-    return paged(rows.map(toLogView), total, page, pageSize);
+    return paged(rows.map(toCheckpointView), total, page, pageSize);
   }
 
   async suggestions(viewerId: string) {

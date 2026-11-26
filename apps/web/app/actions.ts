@@ -13,7 +13,10 @@ import {
   type ReviewComment,
   type SteamImportInput,
   type SteamImportResult,
-  type LogEntryInput,
+  type CheckpointInput,
+  type CheckpointView,
+  type SaveReviewInput,
+  type ViewerSave,
   type UserGameState,
 } from '@savepoint/shared';
 import { revalidatePath } from 'next/cache';
@@ -91,8 +94,30 @@ export async function setFavoritesAction(gameIds: string[], username: string) {
   return res;
 }
 
-export async function createLogAction(input: LogEntryInput, slug: string) {
-  const res = await run(() => api<{ id: string }>('/logs', { method: 'POST', json: input }));
+/** Novo checkpoint no save atual. */
+export async function createLogAction(input: CheckpointInput, slug: string) {
+  const res = await run(() => api<CheckpointView>('/logs', { method: 'POST', json: input }));
+  revalidatePath(`/games/${slug}`);
+  return res;
+}
+
+/** Mostrar/esconder um checkpoint dos outros. */
+export async function setCheckpointVisibilityAction(id: string, isPublic: boolean, path: string) {
+  const res = await run(() => api<{ isPublic: boolean }>(`/logs/${id}`, { method: 'PATCH', json: { isPublic } }));
+  revalidatePath(path);
+  return res;
+}
+
+/** Rejogar: abre um save novo. */
+export async function replayAction(gameId: string, slug: string) {
+  const res = await run(() => api<ViewerSave>('/saves/replay', { method: 'POST', json: { gameId } }));
+  revalidatePath(`/games/${slug}`);
+  return res;
+}
+
+/** Nota + review de um save fechado (ou "Sem fim"). */
+export async function reviewSaveAction(saveId: string, input: SaveReviewInput, slug: string) {
+  const res = await run(() => api<ViewerSave>(`/saves/${saveId}/review`, { method: 'PUT', json: input }));
   revalidatePath(`/games/${slug}`);
   return res;
 }
@@ -101,8 +126,8 @@ export async function createLogAction(input: LogEntryInput, slug: string) {
 export async function getLogContextAction(slug: string) {
   return run(async () => {
     const game = await api<GameDetail>(`/games/${encodeURIComponent(slug)}`);
-    const { platformList, viewer, ...summary } = game;
-    return { game: summary as GameSummary, platforms: platformList, state: viewer };
+    const { platformList, viewer, viewerSave, ...summary } = game;
+    return { game: summary as GameSummary, platforms: platformList, state: viewer, save: viewerSave };
   });
 }
 
@@ -112,20 +137,21 @@ export async function deleteLogAction(id: string, path: string) {
   return res;
 }
 
-export async function toggleReviewLikeAction(logId: string) {
-  return run(() => api<{ liked: boolean; likeCount: number }>(`/logs/${logId}/like`, { method: 'POST' }));
+// Reviews são de saves: o id é o do save.
+export async function toggleReviewLikeAction(saveId: string) {
+  return run(() => api<{ liked: boolean; likeCount: number }>(`/saves/${saveId}/like`, { method: 'POST' }));
 }
 
-export async function getCommentsAction(logId: string) {
-  return run(() => api<ReviewComment[]>(`/logs/${logId}/comments`));
+export async function getCommentsAction(saveId: string) {
+  return run(() => api<ReviewComment[]>(`/saves/${saveId}/comments`));
 }
 
-export async function addCommentAction(logId: string, body: string) {
-  return run(() => api<ReviewComment>(`/logs/${logId}/comments`, { method: 'POST', json: { body } }));
+export async function addCommentAction(saveId: string, body: string) {
+  return run(() => api<ReviewComment>(`/saves/${saveId}/comments`, { method: 'POST', json: { body } }));
 }
 
 export async function deleteCommentAction(commentId: string) {
-  return run(() => api(`/logs/comments/${commentId}`, { method: 'DELETE' }));
+  return run(() => api(`/saves/comments/${commentId}`, { method: 'DELETE' }));
 }
 
 // ─── Social ──────────────────────────────────────────────────────────────────
