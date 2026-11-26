@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { cache } from 'react';
 import { Review } from '@/components/Review';
 import { ShareButton } from '@/components/ShareButton';
+import { StoryButton } from '@/components/StoryButton';
 import { apiOrNotFound } from '@/lib/api';
 import { reviewPath } from '@/lib/format';
 import { getViewer } from '@/lib/session';
@@ -43,6 +44,7 @@ export default async function ReviewPage({ params }: Props) {
       <Review log={review} canLike={Boolean(viewer)} />
       <p className="muted" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, fontSize: 13 }}>
         <ShareButton path={reviewPath(review)} title={`Review de ${review.game.title} por ${review.user.displayName}`} />
+        <StoryButton path={`${reviewPath(review)}/story`} fileName={`savepoint-${review.game.slug}.png`} />
         <span>
         <Link href={`/u/${review.user.username}/reviews`}>Todas as reviews de {review.user.displayName}</Link>
         {' · '}
