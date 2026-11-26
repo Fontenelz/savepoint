@@ -1,6 +1,7 @@
 import { PlayStatus, PrismaClient } from '@prisma/client';
 import { hash } from 'bcryptjs';
 import { GAMES, GENRES, LISTS, PLATFORMS, REVIEWS, TASTES, USERS } from './seed-data';
+import { ENDLESS_GENRE_SLUGS } from '../src/catalog/endless-hint';
 
 const prisma = new PrismaClient();
 const DEMO_PASSWORD = 'savepoint123';
@@ -70,7 +71,7 @@ async function main() {
         summary: g.summary,
         avgHours: g.hours,
         // Curadoria: sem tempo para zerar = jogo sem fim (Minecraft, Mario Kart); esportes e MMO também.
-        endlessHint: g.hours === null || g.genres.some((x) => x === 'esportes' || x === 'multijogador-massivo'),
+        endlessHint: g.hours === null || g.genres.some((x) => ENDLESS_GENRE_SLUGS.includes(x)),
         source: 'LOCAL',
         genres: { connect: g.genres.map((slug) => ({ slug })) },
         platforms: { connect: g.platforms.map((slug) => ({ slug })) },
