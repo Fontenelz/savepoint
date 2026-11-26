@@ -56,6 +56,7 @@ model User {
 
   library      UserGame[]
   logs         LogEntry[]
+  saves        Save[]
   lists        GameList[]
   reviewLikes  ReviewLike[]
   comments     ReviewComment[]
@@ -103,6 +104,7 @@ model Game {
   platforms Platform[]
   entries   UserGame[]
   logs      LogEntry[]
+  saves     Save[]
   listItems ListItem[]
 
   @@unique([source, externalId])
@@ -127,6 +129,7 @@ model Platform {
   games     Game[]
   entries   UserGame[]
   logs      LogEntry[]
+  saves     Save[]
 }
 
 /// A "estante": o estado atual de um jogo para um usuário.
@@ -156,53 +159,106 @@ model UserGame {
   @@index([gameId, status])
 }
 
-/// O "diário": cada sessão/zerada registrada, com review opcional.
-model LogEntry {
-  id         String   @id @default(cuid())
+/// Save = uma jornada completa com o jogo (Save 1, Save 2… ao rejogar).
+/// Aberto: PLAYING/PAUSED (e ENDLESS, que nunca fecha). Fechado: COMPLETED/MASTERED/DROPPED.
+/// Nota e review do save só com ele fechado (ou ENDLESS). A nota oficial do jogo fica em
+/// UserGame.rating: a pessoa escolhe se a nota de um save novo a substitui.
+model Save {
+  id         String     @id @default(cuid())
   userId     String
   gameId     String
-  playedOn   DateTime @db.Date
+  /// 1, 2, 3… por usuário e jogo
+  number     Int
+  status     PlayStatus
+  startedAt  DateTime?  @db.Date
+  endedAt    DateTime?  @db.Date
   platformId String?
   hours      Float?
-  finished   Boolean  @default(false)
-  replay     Boolean  @default(false)
+  /// 1–10 (meia estrela = 1)
   rating     Int?
-  liked      Boolean  @default(false)
+  liked      Boolean    @default(false)
   review     String?
-  spoiler    Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  spoiler    Boolean    @default(false)
+  /// Quando a review foi publicada (ordena as reviews)
+  reviewedAt DateTime?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
 
-  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  game     Game         @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  platform Platform?    @relation(fields: [platformId], references: [id], onDelete: SetNull)
-  likes    ReviewLike[]
-  comments ReviewComment[]
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game        Game            @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  platform    Platform?       @relation(fields: [platformId], references: [id], onDelete: SetNull)
+  checkpoints LogEntry[]
+  likes       ReviewLike[]
+  comments    ReviewComment[]
+
+  @@unique([userId, gameId, number])
+  @@index([gameId, reviewedAt])
+  @@index([userId, reviewedAt])
+}
+
+enum CheckpointKind {
+  /// Sessão/anotação registrada pelo jogador
+  SESSION
+  /// Começou o save (automático)
+  STARTED
+  /// Fechou o save: zerou, fez 100% ou abandonou (automático)
+  CLOSED
+}
+
+/// Checkpoint: um registro do diário dentro de um save. Não tem nota nem review.
+model LogEntry {
+  id         String         @id @default(cuid())
+  userId     String
+  gameId     String
+  saveId     String
+  kind       CheckpointKind @default(SESSION)
+  playedOn   DateTime       @db.Date
+  platformId String?
+  hours      Float?
+  note       String?
+  spoiler    Boolean        @default(false)
+  isPublic   Boolean        @default(true)
+  createdAt  DateTime       @default(now())
+
+  /// Legado (antes dos saves): mantidos só para conferência/rollback. Não usar.
+  finished Boolean @default(false)
+  replay   Boolean @default(false)
+  rating   Int?
+  liked    Boolean @default(false)
+  review   String?
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game     Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  save     Save      @relation(fields: [saveId], references: [id], onDelete: Cascade)
+  platform Platform? @relation(fields: [platformId], references: [id], onDelete: SetNull)
 
   @@index([userId, playedOn])
   @@index([gameId, createdAt])
+  @@index([saveId, playedOn])
 }
 
+/// Curtida numa review (de um save).
 model ReviewLike {
   userId    String
-  logId     String
+  saveId    String
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  log       LogEntry @relation(fields: [logId], references: [id], onDelete: Cascade)
+  save      Save     @relation(fields: [saveId], references: [id], onDelete: Cascade)
 
-  @@id([userId, logId])
+  @@id([userId, saveId])
 }
 
-/// Resposta a uma review (entrada do diário com texto).
+/// Resposta a uma review (de um save).
 model ReviewComment {
   id        String   @id @default(cuid())
-  logId     String
+  saveId    String
   userId    String
   body      String
   createdAt DateTime @default(now())
-  log       LogEntry @relation(fields: [logId], references: [id], onDelete: Cascade)
+  save      Save     @relation(fields: [saveId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([logId, createdAt])
+  @@index([saveId, createdAt])
 }
 
 model Follow {

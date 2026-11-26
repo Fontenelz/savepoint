@@ -1,4 +1,4 @@
-import type { CatalogSource, PlayStatus } from './enums';
+import type { CatalogSource, CheckpointKind, PlayStatus } from './enums';
 
 export interface UserSummary {
   id: string;
@@ -73,25 +73,63 @@ export interface UserGameState {
    * Não é a nota do usuário: não entra em médias até ele confirmar (gravando em `rating`).
    */
   suggested: { rating: number; steamScore: number } | null;
+  /** Save atual depois da mudança. Só vem em PUT /library/:gameId. */
+  save?: ViewerSave | null;
 }
 
-export interface LogView {
+/** Resumo de um save (uma jornada com o jogo). */
+export interface SaveSummary {
   id: string;
+  /** 1, 2, 3… (Save 2 = rejogou uma vez) */
+  number: number;
+  status: PlayStatus;
+  startedAt: string | null;
+  endedAt: string | null;
+  rating: number | null;
+  hasReview: boolean;
+}
+
+/** Checkpoint do diário (sessão, início ou fechamento de um save). */
+export interface CheckpointView {
+  id: string;
+  kind: CheckpointKind;
   playedOn: string;
+  hours: number | null;
+  platform: string | null;
+  note: string | null;
+  spoiler: boolean;
+  isPublic: boolean;
+  createdAt: string;
+  save: SaveSummary;
+  user: UserSummary;
+  game: GameSummary;
+}
+
+/** Review = avaliação de um save fechado. O id é o do save. */
+export interface ReviewView {
+  id: string;
+  save: SaveSummary;
   rating: number | null;
   liked: boolean;
   review: string | null;
   spoiler: boolean;
-  finished: boolean;
-  replay: boolean;
-  hours: number | null;
-  platform: string | null;
+  /** Quando foi publicada. */
   createdAt: string;
+  platform: string | null;
+  hours: number | null;
   user: UserSummary;
   game: GameSummary;
   likeCount: number;
   viewerLiked: boolean;
   commentCount: number;
+}
+
+/** Save atual do usuário logado num jogo (painel da página do jogo). */
+export interface ViewerSave extends SaveSummary {
+  review: string | null;
+  spoiler: boolean;
+  liked: boolean;
+  checkpointCount: number;
 }
 
 export interface ReviewComment {
@@ -157,8 +195,10 @@ export interface GameDetail extends GameSummary {
     communityHours: number | null;
   };
   viewer: UserGameState | null;
-  popularReviews: LogView[];
-  recentReviews: LogView[];
+  /** Save atual (o mais recente) do usuário logado; null se nunca começou. */
+  viewerSave: ViewerSave | null;
+  popularReviews: ReviewView[];
+  recentReviews: ReviewView[];
   lists: ListSummary[];
   friends: FriendEntry[];
   /** Jogos parecidos (gêneros e plataformas em comum). */
@@ -187,8 +227,8 @@ export interface Profile {
   histogram: number[];
   topGenres: { name: string; count: number }[];
   topPlatforms: { name: string; count: number }[];
-  recentLogs: LogView[];
-  recentReviews: LogView[];
+  recentLogs: CheckpointView[];
+  recentReviews: ReviewView[];
   currentlyPlaying: GameSummary[];
 }
 
@@ -241,10 +281,10 @@ export interface RankingData {
 
 export interface HomeData {
   trending: GameSummary[];
-  recentReviews: LogView[];
-  popularReviews: LogView[];
+  recentReviews: ReviewView[];
+  popularReviews: ReviewView[];
   lists: ListSummary[];
-  friends: LogView[];
+  friends: CheckpointView[];
   totals: { games: number; users: number; logs: number };
 }
 

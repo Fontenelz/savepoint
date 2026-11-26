@@ -16,6 +16,17 @@ function rng(seed: number) {
   };
 }
 const rand = rng(42);
+
+/** Anotações de checkpoints (sessões). */
+const NOTES = [
+  'Primeiro chefe derrotado depois de umas dez tentativas.',
+  'Explorei o mapa inteiro hoje, a ambientação é absurda.',
+  'Travei num puzzle, amanhã eu volto.',
+  'Sessão curta, só farmando recurso.',
+  'A história finalmente engrenou.',
+  'Mudei a build e o jogo ficou outro.',
+  'Joguei com amigos, rendeu boas risadas.',
+] as const;
 const pick = <T>(arr: readonly T[]) => arr[Math.floor(rand() * arr.length)];
 const daysAgo = (d: number) => {
   const date = new Date();
@@ -28,9 +39,11 @@ async function main() {
   console.log('🧹 Limpando banco...');
   await prisma.$transaction([
     prisma.reviewLike.deleteMany(),
+    prisma.reviewComment.deleteMany(),
     prisma.listItem.deleteMany(),
     prisma.gameList.deleteMany(),
     prisma.logEntry.deleteMany(),
+    prisma.save.deleteMany(),
     prisma.userGame.deleteMany(),
     prisma.follow.deleteMany(),
     prisma.game.deleteMany(),
@@ -82,7 +95,7 @@ async function main() {
   }
 
   console.log('🗂️  Estantes, diários e reviews...');
-  const logIds: string[] = [];
+  const reviewSaveIds: string[] = [];
   for (const u of USERS) {
     const userId = users.get(u.username)!;
     const taste = TASTES[u.username];
@@ -107,7 +120,9 @@ async function main() {
 
       const affinity = g.data.genres.some((x) => taste.includes(x)) ? 1 : -1;
       const base = g.data.q + affinity + Math.round((rand() - 0.5) * 3) - (status === 'DROPPED' ? 4 : 0);
-      const rating = status === 'BACKLOG' ? null : Math.max(1, Math.min(10, base));
+      // Nota oficial só com save fechado ou "Sem fim" (regra da jornada).
+      const rateable = status === 'COMPLETED' || status === 'MASTERED' || status === 'DROPPED' || status === 'ENDLESS';
+      const rating = rateable ? Math.max(1, Math.min(10, base)) : null;
       const hoursBase = g.data.hours ?? 40 + rand() * 200;
       const hours =
         status === 'BACKLOG' ? null
@@ -138,33 +153,62 @@ async function main() {
 
       if (status === 'BACKLOG') continue;
 
-      // Entradas de diário: uma sessão "jogando" + a zerada (às vezes um replay).
-      const entries: { day: number; finished: boolean; replay: boolean }[] = [];
-      if (finished) entries.push({ day: finishedDay, finished: true, replay: false });
-      else entries.push({ day: Math.floor(rand() * 60), finished: false, replay: false });
-      if (finished && rand() < 0.15) entries.push({ day: Math.floor(rand() * finishedDay), finished: true, replay: true });
+      // Saves: às vezes um Save 1 já zerado antes (rejogou) + o save atual com checkpoints.
+      const closed = finished || status === 'DROPPED';
+      const startDay = finishedDay + Math.floor(rand() * 40) + 5;
+      const saves: { status: PlayStatus; start: number; end: number | null }[] = [];
+      if (finished && rand() < 0.15) saves.push({ status: 'COMPLETED', start: startDay + 200, end: startDay + 160 });
+      saves.push({ status, start: startDay, end: closed ? finishedDay : null });
 
-      for (const e of entries) {
+      for (const [i, sv] of saves.entries()) {
+        const current = i === saves.length - 1;
         const tier = (rating ?? 5) >= 8 ? 'high' : (rating ?? 5) >= 5 ? 'mid' : 'low';
-        const withReview = rand() < (e.finished ? 0.55 : 0.25);
-        const playedOn = daysAgo(e.day);
-        const log = await prisma.logEntry.create({
+        const svRateable = sv.status !== 'PLAYING' && sv.status !== 'PAUSED';
+        const withReview = svRateable && rand() < (sv.status === 'ENDLESS' ? 0.3 : 0.55);
+        const endedAt = sv.end === null ? null : daysAgo(sv.end);
+        const save = await prisma.save.create({
           data: {
             userId,
             gameId: g.id,
-            playedOn,
-            createdAt: new Date(playedOn.getTime() + 1000 * 60 * 60 * (12 + Math.floor(rand() * 10))),
+            number: i + 1,
+            status: sv.status,
+            startedAt: daysAgo(sv.start),
+            endedAt,
             platformId,
             hours,
-            finished: e.finished,
-            replay: e.replay,
-            rating,
-            liked: rating !== null && rating >= 8,
+            rating: svRateable ? rating : null,
+            liked: svRateable && rating !== null && rating >= 8,
             review: withReview ? pick(REVIEWS[tier]) : null,
             spoiler: withReview && rand() < 0.08,
+            reviewedAt: withReview && endedAt ? new Date(endedAt.getTime() + 1000 * 60 * 60 * 20) : withReview ? daysAgo(0) : null,
           },
         });
-        if (withReview) logIds.push(log.id);
+        if (withReview) reviewSaveIds.push(save.id);
+
+        const checkpoints: { kind: 'STARTED' | 'SESSION' | 'CLOSED'; day: number; note?: string }[] = [
+          { kind: 'STARTED', day: sv.start },
+        ];
+        const sessions = current ? Math.floor(rand() * 3) : 0;
+        for (let k = 0; k < sessions; k++) {
+          const day = Math.max(sv.end ?? 0, Math.floor(sv.start - rand() * (sv.start - (sv.end ?? 0))));
+          checkpoints.push({ kind: 'SESSION', day, note: rand() < 0.5 ? pick(NOTES) : undefined });
+        }
+        if (sv.end !== null) checkpoints.push({ kind: 'CLOSED', day: sv.end });
+        for (const c of checkpoints) {
+          const playedOn = daysAgo(c.day);
+          await prisma.logEntry.create({
+            data: {
+              userId,
+              gameId: g.id,
+              saveId: save.id,
+              kind: c.kind,
+              playedOn,
+              createdAt: new Date(playedOn.getTime() + 1000 * 60 * 60 * (12 + Math.floor(rand() * 10))),
+              platformId,
+              note: c.note ?? null,
+            },
+          });
+        }
       }
     }
   }
@@ -176,9 +220,9 @@ async function main() {
       if (a !== b && rand() < 0.7) await prisma.follow.create({ data: { followerId: a, followingId: b } });
     }
   }
-  for (const logId of logIds) {
+  for (const saveId of reviewSaveIds) {
     for (const u of ids) {
-      if (rand() < 0.35) await prisma.reviewLike.create({ data: { userId: u, logId } }).catch(() => undefined);
+      if (rand() < 0.35) await prisma.reviewLike.create({ data: { userId: u, saveId } }).catch(() => undefined);
     }
   }
 

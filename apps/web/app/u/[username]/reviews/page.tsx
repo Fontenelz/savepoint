@@ -1,4 +1,4 @@
-import type { LogView, Paginated } from '@savepoint/shared';
+import type { Paginated, ReviewView } from '@savepoint/shared';
 import { Empty, Pagination } from '@/components/bits';
 import { Review } from '@/components/Review';
 import { api } from '@/lib/api';
@@ -15,7 +15,7 @@ export default async function ReviewsPage({
   const { page = '1' } = await searchParams;
   const [viewer, data] = await Promise.all([
     getViewer(),
-    api<Paginated<LogView>>(`/users/${encodeURIComponent(username)}/reviews?page=${page}`),
+    api<Paginated<ReviewView>>(`/users/${encodeURIComponent(username)}/reviews?page=${page}`),
   ]);
 
   return (

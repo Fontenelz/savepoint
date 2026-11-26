@@ -14,6 +14,7 @@ import { STEAM_HOSTS } from '../catalog/providers/wiki-steam.source';
 import { gameSummarySelect, toGameSummary } from '../core/mappers';
 import { AuthService } from '../auth/auth.service';
 import { applyAccountProfile } from '../core/account-profile';
+import { JourneyService } from '../core/journey.service';
 import { MediaService } from '../core/media.service';
 import { PrismaService } from '../core/prisma.service';
 import { StatsService } from '../core/stats.service';
@@ -46,6 +47,7 @@ export class SteamService {
     private readonly catalog: CatalogService,
     private readonly games: GamesService,
     private readonly auth: AuthService,
+    private readonly journey: JourneyService,
   ) {}
 
   enabled() {
@@ -197,10 +199,16 @@ export class SteamService {
           if (Object.keys(data).length) {
             await this.prisma.userGame.update({ where: { userId_gameId: { userId, gameId: game.id } }, data });
           }
+          // Status novo abre/fecha o save, sem checkpoints (não inunda o diário/feed com a importação).
+          if (data.status) await this.journey.applyStatus(this.prisma, userId, game.id, item.status, { checkpoints: false });
           result.updated++;
         } else {
           await this.prisma.userGame.create({
             data: { userId, gameId: game.id, status: item.status, hoursPlayed: hours, platformId: pc?.id ?? null },
+          });
+          await this.journey.applyStatus(this.prisma, userId, game.id, item.status, {
+            platformId: pc?.id ?? null,
+            checkpoints: false,
           });
           result.added++;
         }

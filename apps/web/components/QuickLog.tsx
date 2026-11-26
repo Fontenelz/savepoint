@@ -1,6 +1,6 @@
 'use client';
 
-import type { GameSummary, Platform, UserGameState } from '@savepoint/shared';
+import type { GameSummary, Platform, UserGameState, ViewerSave } from '@savepoint/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -21,7 +21,7 @@ const EMPTY: UserGameState = {
   suggested: null,
 };
 
-type Ctx = { game: GameSummary; platforms: Platform[]; state: UserGameState };
+type Ctx = { game: GameSummary; platforms: Platform[]; state: UserGameState; save: ViewerSave | null };
 
 /**
  * Botão "+ Registrar" do cabeçalho: escolhe o jogo numa busca e abre o mesmo formulário do diário
@@ -152,12 +152,13 @@ export function QuickLog() {
           game={ctx.game}
           platforms={ctx.platforms}
           defaults={ctx.state}
+          save={ctx.save}
         />
       )}
 
       {saved && (
         <div className="toast" role="status">
-          <Icon name="check" size={15} /> <span>{saved.title} registrado no diário.</span>{' '}
+          <Icon name="check" size={15} /> <span>Checkpoint salvo em {saved.title}.</span>{' '}
           <Link href={`/games/${saved.slug}`} onClick={() => setSaved(null)}>
             Ver jogo
           </Link>

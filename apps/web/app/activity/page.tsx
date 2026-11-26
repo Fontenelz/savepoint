@@ -1,4 +1,4 @@
-import type { LogView, Paginated, UserSummary } from '@savepoint/shared';
+import type { CheckpointView, Paginated, UserSummary } from '@savepoint/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
@@ -8,24 +8,18 @@ import { GameCover } from '@/components/GameCover';
 import { Icon } from '@/components/Icon';
 import { api } from '@/lib/api';
 import { relativeTime, shortDate } from '@/lib/format';
+import { checkpointRating, checkpointVerb } from '@/lib/journey';
 import { getViewer } from '@/lib/session';
 
 // Página pessoal: fora da busca.
 export const metadata: Metadata = { title: 'Atividade', robots: { index: false, follow: false } };
-
-function verb(log: LogView) {
-  if (log.replay) return 'rejogou';
-  if (log.finished) return 'zerou';
-  if (log.review && log.rating) return 'avaliou';
-  return 'jogou';
-}
 
 export default async function ActivityPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const viewer = await getViewer();
   if (!viewer) redirect('/login?next=/activity');
   const { page = '1' } = await searchParams;
   const [feed, suggestions] = await Promise.all([
-    api<Paginated<LogView>>(`/feed?page=${page}`),
+    api<Paginated<CheckpointView>>(`/feed?page=${page}`),
     api<(UserSummary & { bio: string | null })[]>('/me/suggestions'),
   ]);
 
@@ -52,20 +46,25 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
                     <Link href={`/u/${log.user.username}`}>
                       <b>{log.user.displayName}</b>
                     </Link>{' '}
-                    {verb(log)}{' '}
+                    {checkpointVerb(log)}{' '}
                     <Link className="game" href={`/games/${log.game.slug}`}>
                       {log.game.title}
                     </Link>{' '}
-                    <Stars rating={log.rating} />{' '}
-                    {log.liked && <Icon name="heart" size={12} fill className="heart" />}
+                    <Stars rating={checkpointRating(log)} />{' '}
+                    {log.save.number > 1 && log.kind !== 'STARTED' && <span className="tag">Save {log.save.number}</span>}
                   </p>
                   <div className="when">
                     {shortDate(log.playedOn)}
                     {log.platform && ` · ${log.platform}`}
                     {log.hours != null && ` · ${Math.round(log.hours)}h`} · {relativeTime(log.createdAt)}
                   </div>
-                  {log.review && !log.spoiler && <blockquote>{log.review}</blockquote>}
-                  {log.review && log.spoiler && <blockquote className="muted">Review com spoilers — veja na página do jogo.</blockquote>}
+                  {log.note && !log.spoiler && <blockquote>{log.note}</blockquote>}
+                  {log.note && log.spoiler && <blockquote className="muted">Anotação com spoilers.</blockquote>}
+                  {log.kind === 'CLOSED' && log.save.hasReview && (
+                    <Link href={`/games/${log.game.slug}#reviews`} className="muted" style={{ fontSize: 13 }}>
+                      <Icon name="text" size={12} /> Ler a review
+                    </Link>
+                  )}
                 </div>
                 <Link href={`/games/${log.game.slug}`}>
                   <GameCover game={log.game} />

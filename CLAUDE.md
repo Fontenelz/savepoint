@@ -34,7 +34,9 @@ Env: `apps/api/.env` (DATABASE_URL, JWT_SECRET, IGDB opcional) e `apps/web/.env.
 
 **Domínio / API**
 - Estante (`UserGame`): 7 status (Quero jogar, Jogando, Pausado, Zerado, 100%, Abandonado, Sem fim), nota 1–10 (meia estrela), like, Top 4, plataforma, horas.
-- Diário (`LogEntry`) com replays e reviews (aviso de spoiler); curtidas em reviews.
+- **Jornada do jogador** (`JourneyService`): **Save** = uma jornada com o jogo (Save 1, Save 2… ao rejogar); **checkpoint** (`LogEntry`) = registro do diário dentro do save, sem nota/review, público por padrão (pode ser privado).
+  - Nota e review são do save e só com ele fechado (Zerado/100%/Abandonado) ou "Sem fim". A nota oficial fica em `UserGame.rating` (entra na média); ao avaliar um save novo, a pessoa escolhe se substitui.
+  - Status da estante reflete o save atual; fechado → Jogando reabre o mesmo save; "Rejogar" (`POST /saves/replay`) abre o próximo. Reviews, curtidas e respostas em `/saves/:id`.
 - Listas (livres ou ranqueadas), follows, feed de atividade, sugestões de quem seguir.
 - Estatísticas desnormalizadas em `Game` (`StatsService`).
 - Endpoints principais: `/home`, `/games`, `/games/:slug`, `/library/:gameId`, `/logs`, `/lists`, `/users/:username` (+ `/games`, `/diary`, `/reviews`, `/lists`, `/queue`), `/feed`, `/catalog/*`.

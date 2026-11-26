@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { MAX_FAVORITES, type GameSummary, type LibraryEntryInput, type UserGameState, type ViewerGameMark } from '@savepoint/shared';
+import { MAX_FAVORITES, canRate, type GameSummary, type LibraryEntryInput, type UserGameState, type ViewerGameMark } from '@savepoint/shared';
 import { fromDateString, gameSummarySelect, toGameSummary, toUserGameState, userGameStateSelect } from '../core/mappers';
+import { JourneyService, todayDate } from '../core/journey.service';
 import { PrismaService } from '../core/prisma.service';
 import { StatsService } from '../core/stats.service';
 
@@ -9,45 +10,67 @@ export class LibraryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly stats: StatsService,
+    private readonly journey: JourneyService,
   ) {}
 
+  /**
+   * Atualiza a estante. Mudança de status passa pela jornada (abre/fecha/reabre o save atual).
+   * Nota oficial só com status que permite avaliar (save fechado ou "Sem fim"); apagar a nota é sempre permitido.
+   */
   async upsert(userId: string, gameId: string, input: LibraryEntryInput): Promise<UserGameState> {
     await this.ensureGame(gameId);
 
-    const data = {
-      status: input.status,
-      rating: input.rating,
-      liked: input.liked,
-      platformId: input.platformId,
-      hoursPlayed: input.hoursPlayed,
-      startedAt: fromDateString(input.startedAt),
-      finishedAt: fromDateString(input.finishedAt),
-    };
-
-    // Ao marcar como zerado pela primeira vez, registra a data automaticamente.
-    if ((input.status === 'COMPLETED' || input.status === 'MASTERED') && input.finishedAt === undefined) {
-      const current = await this.prisma.userGame.findUnique({
+    const entry = await this.prisma.$transaction(async (tx) => {
+      const current = await tx.userGame.findUnique({
         where: { userId_gameId: { userId, gameId } },
-        select: { finishedAt: true },
+        select: { status: true, startedAt: true, finishedAt: true, platformId: true },
       });
-      if (!current?.finishedAt) data.finishedAt = new Date(new Date().toISOString().slice(0, 10));
-    }
-    if (input.status === 'PLAYING' && input.startedAt === undefined) {
-      const current = await this.prisma.userGame.findUnique({
-        where: { userId_gameId: { userId, gameId } },
-        select: { startedAt: true },
-      });
-      if (!current?.startedAt) data.startedAt = new Date(new Date().toISOString().slice(0, 10));
-    }
+      const status = input.status !== undefined ? input.status : (current?.status ?? null);
+      if (input.rating != null && !canRate(status)) {
+        throw new BadRequestException('Avalie quando zerar ou abandonar o jogo.');
+      }
 
-    const entry = await this.prisma.userGame.upsert({
-      where: { userId_gameId: { userId, gameId } },
-      create: { userId, gameId, ...data },
-      update: data,
-      select: userGameStateSelect,
+      const data = {
+        status: input.status,
+        rating: input.rating,
+        liked: input.liked,
+        platformId: input.platformId,
+        hoursPlayed: input.hoursPlayed,
+        startedAt: fromDateString(input.startedAt),
+        finishedAt: fromDateString(input.finishedAt),
+      };
+      const today = todayDate();
+      // Ao marcar como zerado pela primeira vez, registra a data automaticamente.
+      if ((input.status === 'COMPLETED' || input.status === 'MASTERED') && input.finishedAt === undefined && !current?.finishedAt) {
+        data.finishedAt = today;
+      }
+      if (input.status === 'PLAYING' && input.startedAt === undefined && !current?.startedAt) data.startedAt = today;
+
+      let save = await this.journey.applyStatus(tx, userId, gameId, input.status, {
+        startedAt: data.startedAt ?? current?.startedAt ?? null,
+        endedAt: data.finishedAt ?? null,
+        platformId: input.platformId ?? current?.platformId ?? null,
+      });
+      // Nota/like do painel valem também para o save atual, se ele pode ser avaliado.
+      if (save && canRate(save.status) && (input.rating !== undefined || input.liked !== undefined)) {
+        save = await tx.save.update({
+          where: { id: save.id },
+          data: {
+            ...(input.rating !== undefined ? { rating: input.rating } : {}),
+            ...(input.liked !== undefined ? { liked: input.liked } : {}),
+          },
+        });
+      }
+
+      return tx.userGame.upsert({
+        where: { userId_gameId: { userId, gameId } },
+        create: { userId, gameId, ...data },
+        update: data,
+        select: userGameStateSelect,
+      });
     });
     await this.stats.refreshGame(gameId);
-    return toUserGameState(entry);
+    return { ...toUserGameState(entry), save: await this.journey.viewerSave(userId, gameId) };
   }
 
   async remove(userId: string, gameId: string) {

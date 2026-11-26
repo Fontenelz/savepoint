@@ -1,5 +1,13 @@
 import { Prisma } from '@prisma/client';
-import { PLAYED_STATUSES, type GameSummary, type ListSummary, type LogView, type UserGameState } from '@savepoint/shared';
+import {
+  canRate,
+  type CheckpointView,
+  type GameSummary,
+  type ListSummary,
+  type ReviewView,
+  type SaveSummary,
+  type UserGameState,
+} from '@savepoint/shared';
 
 /** Selects e conversores reutilizados por vários módulos (Prisma → contrato da API). */
 
@@ -43,46 +51,106 @@ export function toGameSummary(g: GameSummaryRow): GameSummary {
   };
 }
 
-export function logSelect(viewerId?: string) {
+export const saveSummarySelect = {
+  id: true,
+  number: true,
+  status: true,
+  startedAt: true,
+  endedAt: true,
+  rating: true,
+  review: true,
+} satisfies Prisma.SaveSelect;
+
+type SaveSummaryRow = Prisma.SaveGetPayload<{ select: typeof saveSummarySelect }>;
+
+export function toSaveSummary(s: SaveSummaryRow): SaveSummary {
   return {
-    id: true,
-    playedOn: true,
-    rating: true,
+    id: s.id,
+    number: s.number,
+    status: s.status,
+    startedAt: toDateString(s.startedAt),
+    endedAt: toDateString(s.endedAt),
+    rating: s.rating,
+    hasReview: s.review != null,
+  };
+}
+
+/** Checkpoints visíveis para quem vê: públicos, ou todos se for o dono. */
+export function visibleCheckpoints(viewerId?: string): Prisma.LogEntryWhereInput {
+  return viewerId ? { OR: [{ isPublic: true }, { userId: viewerId }] } : { isPublic: true };
+}
+
+export const checkpointSelect = {
+  id: true,
+  kind: true,
+  playedOn: true,
+  hours: true,
+  note: true,
+  spoiler: true,
+  isPublic: true,
+  createdAt: true,
+  platform: { select: { short: true } },
+  save: { select: saveSummarySelect },
+  user: { select: userSummarySelect },
+  game: { select: gameSummarySelect },
+} satisfies Prisma.LogEntrySelect;
+
+type CheckpointRow = Prisma.LogEntryGetPayload<{ select: typeof checkpointSelect }>;
+
+export function toCheckpointView(l: CheckpointRow): CheckpointView {
+  return {
+    id: l.id,
+    kind: l.kind,
+    playedOn: toDateString(l.playedOn)!,
+    hours: l.hours,
+    platform: l.platform?.short ?? null,
+    note: l.note,
+    spoiler: l.spoiler,
+    isPublic: l.isPublic,
+    createdAt: l.createdAt.toISOString(),
+    save: toSaveSummary(l.save),
+    user: l.user,
+    game: toGameSummary(l.game),
+  };
+}
+
+/** Saves com review publicada. */
+export const hasReview = { review: { not: null } } satisfies Prisma.SaveWhereInput;
+
+export function reviewSelect(viewerId?: string) {
+  return {
+    ...saveSummarySelect,
     liked: true,
-    review: true,
     spoiler: true,
-    finished: true,
-    replay: true,
     hours: true,
+    reviewedAt: true,
     createdAt: true,
     platform: { select: { short: true } },
     user: { select: userSummarySelect },
     game: { select: gameSummarySelect },
     _count: { select: { likes: true, comments: true } },
     likes: { where: { userId: viewerId ?? '__anon__' }, select: { userId: true }, take: 1 },
-  } satisfies Prisma.LogEntrySelect;
+  } satisfies Prisma.SaveSelect;
 }
 
-type LogRow = Prisma.LogEntryGetPayload<{ select: ReturnType<typeof logSelect> }>;
+type ReviewRow = Prisma.SaveGetPayload<{ select: ReturnType<typeof reviewSelect> }>;
 
-export function toLogView(l: LogRow): LogView {
+export function toReviewView(r: ReviewRow): ReviewView {
   return {
-    id: l.id,
-    playedOn: toDateString(l.playedOn)!,
-    rating: l.rating,
-    liked: l.liked,
-    review: l.review,
-    spoiler: l.spoiler,
-    finished: l.finished,
-    replay: l.replay,
-    hours: l.hours,
-    platform: l.platform?.short ?? null,
-    createdAt: l.createdAt.toISOString(),
-    user: l.user,
-    game: toGameSummary(l.game),
-    likeCount: l._count.likes,
-    commentCount: l._count.comments,
-    viewerLiked: l.likes.length > 0,
+    id: r.id,
+    save: toSaveSummary(r),
+    rating: r.rating,
+    liked: r.liked,
+    review: r.review,
+    spoiler: r.spoiler,
+    createdAt: (r.reviewedAt ?? r.createdAt).toISOString(),
+    platform: r.platform?.short ?? null,
+    hours: r.hours,
+    user: r.user,
+    game: toGameSummary(r.game),
+    likeCount: r._count.likes,
+    commentCount: r._count.comments,
+    viewerLiked: r.likes.length > 0,
   };
 }
 
@@ -139,10 +207,9 @@ export function steamScoreToRating(score: number) {
 }
 
 export function toUserGameState({ game, ...s }: StateRow): UserGameState {
-  // Só sugere para quem já jogou (status de jogado ou horas) e ainda não deu nota.
-  const played = (s.status != null && PLAYED_STATUSES.includes(s.status)) || (s.hoursPlayed ?? 0) > 0;
+  // Só sugere para quem pode avaliar (save fechado ou "Sem fim") e ainda não deu nota.
   const suggested =
-    s.rating == null && played && game.steamScore != null && (game.steamReviewCount ?? 0) >= MIN_STEAM_REVIEWS
+    s.rating == null && canRate(s.status) && game.steamScore != null && (game.steamReviewCount ?? 0) >= MIN_STEAM_REVIEWS
       ? { rating: steamScoreToRating(game.steamScore), steamScore: game.steamScore }
       : null;
   return {

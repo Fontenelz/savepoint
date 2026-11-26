@@ -1,4 +1,4 @@
-import { PLAY_STATUS_LABEL, formatAvg, formatHours, type CatalogSource, type GameDetail, type ListSummary } from '@savepoint/shared';
+import { PLAY_STATUS_LABEL, canRate, formatAvg, formatHours, type CatalogSource, type GameDetail, type ListSummary } from '@savepoint/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Avatar, Histogram, ListCard, Poster, SectionHead, ShelfBar, Stars } from '@/components/bits';
@@ -8,6 +8,7 @@ import { Icon, STATUS_COLOR } from '@/components/Icon';
 import { Review } from '@/components/Review';
 import { Slider } from '@/components/Slider';
 import { api, apiOrNotFound } from '@/lib/api';
+import { plural } from '@/lib/format';
 import { getViewer } from '@/lib/session';
 import { SITE_URL, metaDescription, publicPageMeta } from '@/lib/site';
 
@@ -196,7 +197,7 @@ export default async function GamePage({ params }: Props) {
             </div>
             <div>
               <b>{stats.logCount}</b>
-              <span>Registros</span>
+              <span>Checkpoints</span>
             </div>
           </div>
 
@@ -220,15 +221,19 @@ export default async function GamePage({ params }: Props) {
             </section>
           )}
 
-          <section className="section">
+          <section className="section" id="reviews">
             <SectionHead title="Reviews populares" />
             {game.popularReviews.length === 0 && game.recentReviews.length === 0 ? (
               <div className="empty empty-reviews">
                 <Icon name="chat" size={22} />
                 <strong>Nenhuma review ainda</strong>
-                <p>Conte o que achou de {game.title} e seja a primeira voz por aqui.</p>
+                <p>
+                  {viewer && canRate(game.viewerSave?.status)
+                    ? `Conte o que achou de ${game.title} e seja a primeira voz por aqui.`
+                    : 'As reviews chegam quando alguém zera ou abandona o jogo. Até lá, registre sua jornada.'}
+                </p>
                 {viewer ? (
-                  <OpenLogButton>Escrever a primeira review</OpenLogButton>
+                  <OpenLogButton>{canRate(game.viewerSave?.status) ? 'Escrever a primeira review' : 'Novo checkpoint'}</OpenLogButton>
                 ) : (
                   <Link href={`/login?next=/games/${game.slug}`} className="btn btn-sm">
                     Entrar para escrever
@@ -287,13 +292,14 @@ export default async function GamePage({ params }: Props) {
             game={game}
             platforms={game.platformList}
             initial={game.viewer}
+            initialSave={game.viewerSave}
             loggedIn={Boolean(viewer)}
             myLists={myLists.map((l) => ({ id: l.id, title: l.title }))}
           />
 
           <div className="panel">
             <h3>
-              Avaliações <span className="mono">{stats.logCount} registros</span>
+              Avaliações <span className="mono">{plural(stats.ratingCount, 'nota', 'notas')}</span>
             </h3>
             <Histogram histogram={stats.histogram} avg={stats.ratingAvg} count={stats.ratingCount} />
           </div>

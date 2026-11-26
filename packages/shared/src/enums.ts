@@ -43,6 +43,23 @@ export const PLAYED_STATUSES: PlayStatus[] = [
 
 export const FINISHED_STATUSES: PlayStatus[] = ['COMPLETED', 'MASTERED'];
 
+/** Status que fecham um save (a jornada terminou). */
+export const CLOSED_STATUSES: PlayStatus[] = ['COMPLETED', 'MASTERED', 'DROPPED'];
+
+/**
+ * Status que permitem nota e review oficial: save fechado, ou "Sem fim" (jogos que nunca acabam).
+ * Quero jogar, Jogando e Pausado não avaliam: "avalie quando zerar ou abandonar".
+ */
+export const RATEABLE_STATUSES: PlayStatus[] = ['COMPLETED', 'MASTERED', 'DROPPED', 'ENDLESS'];
+
+export function canRate(status: PlayStatus | null | undefined): boolean {
+  return status != null && RATEABLE_STATUSES.includes(status);
+}
+
+/** Tipos de checkpoint do diário: sessão do jogador, início do save e fechamento (automáticos). */
+export const CHECKPOINT_KINDS = ['SESSION', 'STARTED', 'CLOSED'] as const;
+export type CheckpointKind = (typeof CHECKPOINT_KINDS)[number];
+
 export const CATALOG_SOURCES = ['LOCAL', 'COMMUNITY', 'IGDB', 'STEAM', 'RAWG'] as const;
 export type CatalogSource = (typeof CATALOG_SOURCES)[number];
 

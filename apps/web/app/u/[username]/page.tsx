@@ -1,4 +1,5 @@
 import { MAX_FAVORITES, type QueueData } from '@savepoint/shared';
+import { checkpointLabel, checkpointRating } from '@/lib/journey';
 import { api } from '@/lib/api';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -71,11 +72,11 @@ export default async function ProfilePage({ params }: Props) {
             <Slider label="Atividade recente">
               {profile.recentLogs.map((log) => (
                 <Poster key={log.id} game={log.game}>
-                  <Stars rating={log.rating} />
-                  <span style={{ display: 'flex', gap: 4 }}>
-                    {log.liked && <Icon name="heart" size={11} fill className="heart" />}
-                    {log.replay && <Icon name="replay" size={11} />}
-                    {log.review && <Icon name="text" size={11} />}
+                  <Stars rating={checkpointRating(log)} />
+                  <span style={{ display: 'flex', gap: 4 }} title={checkpointLabel(log)}>
+                    {log.kind === 'CLOSED' && <Icon name="check" size={11} />}
+                    {log.save.number > 1 && <Icon name="replay" size={11} />}
+                    {log.note && <Icon name="text" size={11} />}
                   </span>
                 </Poster>
               ))}
