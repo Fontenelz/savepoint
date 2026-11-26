@@ -8,7 +8,7 @@
 
 > Projeto de portfólio. Monorepo com **Turborepo + pnpm**, **Next.js 15** (App Router) e **NestJS 11 + Fastify**, **PostgreSQL + Prisma**.
 >
-> **Online:** <https://savepoint-web-taupe.vercel.app> (deploy na Vercel — veja [DEPLOY.md](DEPLOY.md)).
+> **Online:** <https://savepoint-hub.vercel.app> (deploy na Vercel — veja [DEPLOY.md](DEPLOY.md)).
 
 ## Funcionalidades
 
