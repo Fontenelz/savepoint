@@ -293,6 +293,7 @@ export default async function GamePage({ params }: Props) {
             platforms={game.platformList}
             initial={game.viewer}
             initialSave={game.viewerSave}
+            endlessHint={game.endlessHint}
             loggedIn={Boolean(viewer)}
             myLists={myLists.map((l) => ({ id: l.id, title: l.title }))}
           />

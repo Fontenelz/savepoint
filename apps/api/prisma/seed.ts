@@ -69,6 +69,8 @@ async function main() {
         publisher: g.pub ?? g.dev,
         summary: g.summary,
         avgHours: g.hours,
+        // Curadoria: sem tempo para zerar = jogo sem fim (Minecraft, Mario Kart); esportes e MMO também.
+        endlessHint: g.hours === null || g.genres.some((x) => x === 'esportes' || x === 'multijogador-massivo'),
         source: 'LOCAL',
         genres: { connect: g.genres.map((slug) => ({ slug })) },
         platforms: { connect: g.platforms.map((slug) => ({ slug })) },
