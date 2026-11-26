@@ -33,3 +33,8 @@ export function today() {
 export function plural(n: number, one: string, many: string) {
   return `${n.toLocaleString('pt-BR')} ${n === 1 ? one : many}`;
 }
+
+/** Endereço público de uma review (página própria, com prévia de link). */
+export function reviewPath(r: { id: string; user: { username: string } }) {
+  return `/u/${r.user.username}/reviews/${r.id}`;
+}

@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Empty, Poster, UserLink } from '@/components/bits';
 import { Icon } from '@/components/Icon';
+import { ShareButton } from '@/components/ShareButton';
 import { api, apiOrNotFound } from '@/lib/api';
 import { metaDescription, publicPageMeta } from '@/lib/site';
 import { relativeTime } from '@/lib/format';
@@ -44,6 +45,7 @@ export default async function ListPage({ params }: Props) {
           <span className="muted">
             {list.itemCount} {list.itemCount === 1 ? 'jogo' : 'jogos'}
           </span>
+          <ShareButton path={`/lists/${list.id}`} title={list.title} />
           {list.isOwner && (
             <Link href={`/lists/${list.id}/edit`} className="btn btn-sm">
               <Icon name="edit" size={13} /> Editar

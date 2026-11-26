@@ -15,6 +15,7 @@ import {
 import Link from 'next/link';
 import { useEffect, useState, useTransition, type CSSProperties, type ReactNode } from 'react';
 import { addToListAction, removeFromLibraryAction, replayAction, saveLibraryAction, toggleFavoriteAction } from '@/app/actions';
+import { shareLink } from '@/lib/share';
 import { Icon, STATUS_COLOR, STATUS_ICON } from './Icon';
 import { LogDialog } from './LogDialog';
 import { SaveReviewDialog } from './SaveReviewDialog';
@@ -149,22 +150,10 @@ export function GameActions({
 
   /** Compartilhamento nativo no celular; no desktop, copia o link. */
   async function share() {
-    const url = `${window.location.origin}/games/${game.slug}`;
     setError(null);
-    if (navigator.share && window.matchMedia('(hover: none)').matches) {
-      try {
-        await navigator.share({ title: `${game.title} · Savepoint`, url });
-      } catch {
-        /* cancelado pelo usuário */
-      }
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-      setNotice('Link copiado ✓');
-    } catch {
-      setError('Não foi possível copiar o link');
-    }
+    const res = await shareLink(`/games/${game.slug}`, game.title);
+    if (res === 'copied') setNotice('Link copiado ✓');
+    else if (res === 'error') setError('Não foi possível copiar o link');
   }
 
   const hasEntry = state.status || state.rating || state.liked || state.favoriteRank;

@@ -1,6 +1,6 @@
 import { PLAY_STATUS_LABEL, type ReviewView } from '@savepoint/shared';
 import Link from 'next/link';
-import { shortDate } from '@/lib/format';
+import { reviewPath, shortDate } from '@/lib/format';
 import { Poster, Stars, UserLink } from './bits';
 import { Icon, STATUS_COLOR, STATUS_ICON } from './Icon';
 import { LikeButton } from './LikeButton';
@@ -51,7 +51,9 @@ export function Review({
         <ReviewThread logId={log.id} initialCount={log.commentCount} canReply={canLike}>
           <LikeButton logId={log.id} initialLiked={log.viewerLiked} initialCount={log.likeCount} enabled={canLike} />
           <span className="foot-meta">
-            {shortDate(log.save.endedAt ?? log.createdAt)}
+            <Link href={reviewPath(log)} title="Link desta review">
+              {shortDate(log.save.endedAt ?? log.createdAt)}
+            </Link>
             {log.platform && ` · ${log.platform}`}
             {log.hours != null && ` · ${Math.round(log.hours)}h`}
           </span>
