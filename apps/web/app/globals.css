@@ -3586,6 +3586,14 @@ a.chip:hover {
   color: var(--muted);
 }
 
+/* Compartilhar no card: em telas muito estreitas empurraria a data para 2 linhas.
+   Ali a data (link da review) leva à página com os botões de compartilhar. */
+@media (max-width: 389px) {
+  .review-foot .share-compact {
+    display: none;
+  }
+}
+
 .review-foot .like-btn:hover,
 .reply-btn:hover {
   background: var(--surface);

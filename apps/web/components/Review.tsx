@@ -1,10 +1,11 @@
 import { PLAY_STATUS_LABEL, type ReviewView } from '@savepoint/shared';
 import Link from 'next/link';
-import { shortDate } from '@/lib/format';
+import { reviewPath, shortDate } from '@/lib/format';
 import { Poster, Stars, UserLink } from './bits';
 import { Icon, STATUS_COLOR, STATUS_ICON } from './Icon';
 import { LikeButton } from './LikeButton';
 import { ReviewThread } from './ReviewThread';
+import { ShareButton } from './ShareButton';
 
 /** Card de review (avaliação de um save) — usado na home, na página do jogo e no perfil. */
 export function Review({
@@ -50,8 +51,11 @@ export function Review({
           ))}
         <ReviewThread logId={log.id} initialCount={log.commentCount} canReply={canLike}>
           <LikeButton logId={log.id} initialLiked={log.viewerLiked} initialCount={log.likeCount} enabled={canLike} />
+          <ShareButton path={reviewPath(log)} title={`Review de ${log.game.title} por ${log.user.displayName}`} compact />
           <span className="foot-meta">
-            {shortDate(log.save.endedAt ?? log.createdAt)}
+            <Link href={reviewPath(log)} title="Link desta review">
+              {shortDate(log.save.endedAt ?? log.createdAt)}
+            </Link>
             {log.platform && ` · ${log.platform}`}
             {log.hours != null && ` · ${Math.round(log.hours)}h`}
           </span>
