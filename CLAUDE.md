@@ -75,12 +75,13 @@ Env: `apps/api/.env` (DATABASE_URL, JWT_SECRET, IGDB opcional) e `apps/web/.env.
 ## O que falta / próximos passos
 
 - [ ] Conferir visualmente o último ajuste do Top 10 (alinhamento do "1" com a margem — `.slider--rank` com `--rank-shift`).
-- [ ] Testes: nenhum ainda (Jest/Vitest na API, Playwright no web) + CI.
+- [x] CI no GitHub Actions (`.github/workflows/ci.yml`): typecheck, build e `pnpm audit` (só alerta) em push na `main` e em PRs.
+- [ ] Testes: nenhum ainda (Jest/Vitest na API, Playwright no web) — adicionar ao CI quando existirem.
 - [x] Limite de tentativas de login (8 erros/15 min por conta, guardado no banco — `LoginThrottle`).
 - [ ] Upload de foto de perfil (hoje todos usam a silhueta).
 - [ ] Imagens faltando: *Final Fantasy VII Remake* e *Horizon Chase Turbo* (download bloqueado/limitado na rede da empresa — rodar `pnpm catalog:sync` fora dela); *Minecraft* não tem capa na Wikipedia. Exclusivos de console não têm banner (vem da Steam).
 - [x] Importar biblioteca e horas da Steam: Configurações → Steam (OpenID + `STEAM_API_KEY`), importação automática em lotes ao conectar (`SteamModule`). Também `pnpm catalog:import` (IGDB em massa).
 - [ ] "O que jogo agora?" — sugestão do backlog pelo tempo disponível.
 - [ ] Retrospectiva anual compartilhável; comentários em reviews; notificações.
-- [x] **Deploy na Vercel** (ver `DEPLOY.md`): `savepoint-api` (https://savepoint-api.vercel.app/api) e `savepoint-web` (https://savepoint-web-taupe.vercel.app), Prisma Postgres + Vercel Blob, deploy automático a cada push na `main`.
+- [x] **Deploy na Vercel** (ver `DEPLOY.md`): `savepoint-api` (https://savepoint-api.vercel.app/api) e `savepoint-web` (https://savepoint-hub.vercel.app), Prisma Postgres + Vercel Blob, deploy automático a cada push na `main`.
 - [ ] Acesso pelo celular físico: exige `portproxy` + regra de firewall no Windows (WSL2) — ver histórico/README; rede da empresa pode bloquear.

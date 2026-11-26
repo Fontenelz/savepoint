@@ -7,3 +7,8 @@ allowBuilds:
   '@prisma/engines': true
   esbuild: true
   prisma: true
+
+# Segurança: @vercel/oidc@3 (via @vercel/blob) fixa zod 4.1.11, vulnerável (GHSA, < 4.6.6).
+# Remover quando o @vercel/blob passar a depender do @vercel/oidc@4.
+overrides:
+  '@vercel/cli-config@0.3.1>zod': ^4.6.7
