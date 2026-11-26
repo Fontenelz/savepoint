@@ -29,6 +29,7 @@ import {
   userGameStateSelect,
   userSummarySelect,
 } from '../core/mappers';
+import { genresSuggestEndless } from '../catalog/endless-hint';
 import { JourneyService } from '../core/journey.service';
 import { PrismaService } from '../core/prisma.service';
 
@@ -89,6 +90,7 @@ export class GamesService {
         summary: true,
         publisher: true,
         avgHours: true,
+        endlessHint: true,
         backdropUrl: true,
         steamAppId: true,
         source: true,
@@ -181,6 +183,7 @@ export class GamesService {
       summary: game.summary,
       publisher: game.publisher,
       avgHours: game.avgHours,
+      endlessHint: game.endlessHint,
       backdropUrl: game.backdropUrl,
       steamAppId: game.steamAppId,
       source: game.source,
@@ -240,6 +243,7 @@ export class GamesService {
 
   async create(input: CreateGameInput, userId: string): Promise<GameSummary> {
     const slug = await this.uniqueSlug(input.title, input.releaseYear ?? null);
+    const genres = await this.prisma.genre.findMany({ where: { id: { in: input.genreIds ?? [] } }, select: { slug: true } });
 
     const game = await this.prisma.game.create({
       data: {
@@ -253,6 +257,7 @@ export class GamesService {
         coverUrl: input.coverUrl ?? null,
         source: 'COMMUNITY',
         createdById: userId,
+        endlessHint: genresSuggestEndless(genres.map((g) => g.slug)),
         genres: { connect: (input.genreIds ?? []).map((id) => ({ id })) },
         platforms: { connect: (input.platformIds ?? []).map((id) => ({ id })) },
       },

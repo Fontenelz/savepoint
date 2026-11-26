@@ -176,6 +176,8 @@ export interface GameDetail extends GameSummary {
   summary: string | null;
   publisher: string | null;
   avgHours: number | null;
+  /** Sugestão de jogo sem final definido (esportes, MMO, só online): destaca o status "Sem fim". */
+  endlessHint: boolean;
   backdropUrl: string | null;
   /** Para o link "Ver na Steam". */
   steamAppId: string | null;

@@ -11,6 +11,7 @@ import type {
 import { CatalogService } from '../catalog/catalog.service';
 import { SteamStoreClient, plainText, type SteamAppDetails } from '../catalog/providers/steam-store.client';
 import { STEAM_HOSTS } from '../catalog/providers/wiki-steam.source';
+import { steamSuggestsEndless } from '../catalog/endless-hint';
 import { gameSummarySelect, toGameSummary } from '../core/mappers';
 import { AuthService } from '../auth/auth.service';
 import { applyAccountProfile } from '../core/account-profile';
@@ -278,6 +279,7 @@ export class SteamService {
           source: 'STEAM',
           externalId: appId,
           steamAppId: appId,
+          endlessHint: steamSuggestsEndless(d),
           genres: { connect: genreIds.map((id) => ({ id })) },
           platforms: { connect: platformIds.map((id) => ({ id })) },
         },

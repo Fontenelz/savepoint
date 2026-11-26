@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { HttpCacheService } from '../core/http-cache.service';
 import { USER_AGENT } from '../core/media.service';
 import { PrismaService } from '../core/prisma.service';
+import { curatedEndless, genresSuggestEndless, steamSuggestsEndless } from './endless-hint';
 import { canonicalGenre, canonicalPlatform } from './taxonomy';
 import { IgdbProvider, type IgdbDetails } from './providers/igdb.provider';
 import { SteamStoreClient, looksPortuguese, plainText } from './providers/steam-store.client';
@@ -132,7 +133,51 @@ export class CatalogDetailsService {
       results.push(result);
       opts.onProgress?.(result, i, games.length);
     }
+    await this.refreshEndlessHints({ gameIds: games.map((g) => g.id) }).catch((e) =>
+      this.logger.warn(`Sugestão "sem fim": ${e instanceof Error ? e.message : e}`),
+    );
     return results;
+  }
+
+  /**
+   * Recalcula a sugestão de jogo "sem fim" (ver endless-hint.ts): pelos gêneros do catálogo e,
+   * com `steam`, pelas categorias da loja da Steam (respostas em cache por 30 dias).
+   * Devolve os jogos que mudaram.
+   */
+  async refreshEndlessHints(
+    opts: { gameIds?: string[]; steam?: boolean; onProgress?: (title: string, hint: boolean) => void } = {},
+  ): Promise<{ title: string; hint: boolean }[]> {
+    const games = await this.prisma.game.findMany({
+      where: opts.gameIds ? { id: { in: opts.gameIds } } : {},
+      orderBy: { title: 'asc' },
+      select: {
+        id: true,
+        title: true,
+        source: true,
+        avgHours: true,
+        steamAppId: true,
+        endlessHint: true,
+        genres: { select: { slug: true } },
+      },
+    });
+    const changed: { title: string; hint: boolean }[] = [];
+    for (const g of games) {
+      let hint = curatedEndless(g) || genresSuggestEndless(g.genres.map((x) => x.slug));
+      if (!hint && (opts.steam ?? true) && g.steamAppId) {
+        try {
+          hint = steamSuggestsEndless(await this.store.appDetails(g.steamAppId));
+        } catch (e) {
+          this.logger.warn(`Loja da Steam (${g.title}): ${e instanceof Error ? e.message : e}`);
+          continue; // sem resposta da loja: mantém o valor atual
+        }
+      }
+      if (hint !== g.endlessHint) {
+        await this.prisma.game.update({ where: { id: g.id }, data: { endlessHint: hint } });
+        changed.push({ title: g.title, hint });
+        opts.onProgress?.(g.title, hint);
+      }
+    }
+    return changed;
   }
 
   /**

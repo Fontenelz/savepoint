@@ -10,6 +10,8 @@ export interface SteamAppDetails {
   publishers?: string[];
   release_date?: { coming_soon: boolean; date: string };
   genres?: { id: string; description: string }[];
+  /** Single-player, Multi-player, MMO… (ids numéricos). */
+  categories?: { id: number | string; description: string }[];
 }
 
 /** A loja aceita ~200 consultas a cada 5 minutos por IP: mantém um intervalo mínimo entre elas. */

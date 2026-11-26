@@ -54,6 +54,7 @@ export function GameActions({
   loggedIn,
   myLists,
   initialSave = null,
+  endlessHint = false,
 }: {
   game: GameSummary;
   platforms: Platform[];
@@ -61,6 +62,8 @@ export function GameActions({
   loggedIn: boolean;
   myLists: { id: string; title: string }[];
   initialSave?: ViewerSave | null;
+  /** Jogo provavelmente sem final definido (esportes, MMO, só online): destaca "Sem fim". */
+  endlessHint?: boolean;
 }) {
   const [state, setState] = useState<UserGameState>(initial ?? EMPTY);
   const [current, setCurrent] = useState<ViewerSave | null>(initialSave);
@@ -72,6 +75,8 @@ export function GameActions({
   const [pending, start] = useTransition();
 
   const rateable = canRate(current?.status ?? null);
+  // Sugestão, não regra: só destaca enquanto a pessoa ainda não pode avaliar.
+  const showEndlessHint = endlessHint && !canRate(state.status);
   useEffect(() => {
     const open = () => (rateable ? setReviewOpen(true) : setLogOpen(true));
     window.addEventListener(OPEN_LOG_EVENT, open);
@@ -174,7 +179,8 @@ export function GameActions({
             <button
               key={s}
               type="button"
-              className={`status-btn ${state.status === s ? 'on' : ''}`}
+              className={`status-btn ${state.status === s ? 'on' : ''} ${showEndlessHint && s === 'ENDLESS' ? 'hint' : ''}`}
+              title={showEndlessHint && s === 'ENDLESS' ? 'Este jogo parece não ter um final definido' : undefined}
               style={{ '--st': STATUS_COLOR[s] } as CSSProperties}
               aria-pressed={state.status === s}
               onClick={() => save({ status: state.status === s ? null : s })}
@@ -201,6 +207,11 @@ export function GameActions({
             {!canRate(state.status) && (
               <div className="rate-locked">
                 <Icon name="lock" size={11} /> Avalie quando zerar ou abandonar
+                {showEndlessHint && (
+                  <button type="button" className="link-btn" onClick={() => save({ status: 'ENDLESS' })}>
+                    Jogo sem fim? Marque “Sem fim” e avalie quando quiser
+                  </button>
+                )}
               </div>
             )}
             {suggested && (
