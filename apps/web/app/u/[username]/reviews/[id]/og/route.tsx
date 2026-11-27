@@ -1,18 +1,24 @@
-import { PLAY_STATUS_LABEL } from '@savepoint/shared';
-import { Brand, C, Cover, GradientLine, OG_CACHE, OG_SIZE, loadImage, ogImage } from '@/lib/og';
+import { PLAY_STATUS_LABEL, type GameDetail } from '@savepoint/shared';
+import { Brand, C, Cover, GradientLine, OG_CACHE, loadImage, ogImage } from '@/lib/og';
+import { bannerJpeg, bannerResponse } from '@/lib/og-banner';
 import { Heart, ReviewAvatar, STATUS_HEX, StarRow, Tag, excerpt, loadReview } from '@/lib/og-review';
-
-export const size = OG_SIZE;
-export const contentType = 'image/png';
-export const alt = 'Review no Savepoint';
+import { publicApi } from '@/lib/public-api';
 
 /**
- * Review é conteúdo de usuário: gerada a cada pedido e nunca guardada em cache (OG_CACHE.user).
- * Review com spoiler não mostra o texto, igual à página.
+ * GET /u/:usuario/reviews/:id/og — imagem da prévia do link da review.
+ * Com banner do jogo: só a foto (estilo Letterboxd; estrelas e texto vão no título e na descrição).
+ * Sem banner: cartão gerado com estrelas, status e trecho (sem o texto se tiver spoiler).
+ * O cartão tem dado de usuário: gerado a cada pedido, nunca em cache. Sem cache também no banner,
+ * porque a resposta depende de a review existir.
  */
-export default async function Image({ params }: { params: Promise<{ username: string; id: string }> }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ username: string; id: string }> }) {
   const { username, id } = await params;
   const r = await loadReview(username, id);
+  if (r) {
+    const game = await publicApi<GameDetail>(`/games/${encodeURIComponent(r.game.slug)}`);
+    const banner = await bannerJpeg(game?.backdropUrl);
+    if (banner) return bannerResponse(banner, OG_CACHE.user);
+  }
   const [cover, avatar] = await Promise.all([loadImage(r?.game.coverUrl), loadImage(r?.user.avatarUrl)]);
   const title = r?.game.title ?? 'Review não encontrada';
 

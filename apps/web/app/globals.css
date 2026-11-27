@@ -4311,3 +4311,226 @@ html.nav-pending a {
 .rate-locked .link-btn:hover {
   text-decoration: underline;
 }
+
+/* ==========================================================================
+   Página do jogo no celular: botões sobre o banner (‹ ⋯), barra "Você zerou
+   este jogo ⋯" no lugar do painel e folha de ações vinda de baixo
+   ========================================================================== */
+.game-topbar,
+.sheet-bar {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  /* Altura 0: os botões ficam por cima do banner sem empurrar nada */
+  .game-topbar {
+    display: flex;
+    justify-content: space-between;
+    position: relative;
+    z-index: 5;
+    height: 0;
+    padding: 0 var(--gutter);
+  }
+
+  .game-topbar-btn {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    margin-top: 12px;
+    border: 0;
+    border-radius: 50%;
+    color: #fff;
+    background: rgb(10 11 14 / 0.5);
+    backdrop-filter: blur(8px);
+  }
+
+  .game-side > .actions-panel {
+    display: none;
+  }
+
+  /* Ordem no celular: notas → barra → estante da comunidade */
+  .sheet-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    order: 1;
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid var(--line-2);
+    border-radius: var(--radius-lg);
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 15px;
+    text-align: left;
+  }
+
+  .sheet-bar-text {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .sheet-bar > svg:last-child {
+    color: var(--muted);
+  }
+
+  .game-side > .panel-shelf {
+    order: 2;
+  }
+}
+
+html:has(.sheet[open]) {
+  overflow: hidden;
+}
+
+.sheet {
+  position: fixed;
+  inset: auto 0 0;
+  width: 100%;
+  max-width: 480px;
+  max-height: calc(100dvh - 24px);
+  margin: 0 auto;
+  padding: 0 12px calc(12px + env(safe-area-inset-bottom));
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sheet[open] {
+  animation: sheet-up 0.22s ease-out;
+}
+
+.sheet::backdrop {
+  background: rgb(5 6 8 / 0.6);
+  backdrop-filter: blur(14px);
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(32px);
+    opacity: 0;
+  }
+}
+
+.sheet-head {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 18px 0 14px;
+  text-align: center;
+}
+
+.sheet-head strong {
+  font-family: var(--font-display);
+  font-size: 19px;
+}
+
+.sheet-head span {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.sheet-card {
+  border-radius: 14px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.sheet-card .actions-block {
+  border-bottom: 0;
+}
+
+.sheet-icons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 14px 6px 12px;
+}
+
+.sheet-icon {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.sheet-icon.on {
+  color: var(--st);
+}
+
+.sheet-icon.like.on {
+  color: var(--heart);
+}
+
+.sheet-section {
+  padding: 14px;
+}
+
+.sheet .status-btn {
+  font-size: 12px;
+}
+
+.sheet-rate {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.sheet-label {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.sheet-row {
+  display: block;
+  width: 100%;
+  padding: 15px 14px;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font-size: 16px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.sheet-card > * + *,
+.sheet-card > .sheet-row + .sheet-row {
+  border-top: 1px solid var(--line);
+}
+
+.sheet:focus {
+  outline: none;
+}
+
+.sheet-row:active {
+  background: var(--surface);
+}
+
+.sheet-row:disabled {
+  color: var(--muted);
+}
+
+.sheet-row-faint {
+  font-size: 14px;
+  color: var(--faint);
+}
+
+.sheet-done {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 15px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
+}

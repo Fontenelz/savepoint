@@ -6,6 +6,12 @@ import { absoluteMediaUrl } from './public-api';
 /** Tamanho recomendado para pré-visualização de links (WhatsApp, X, Discord, LinkedIn…). */
 export const OG_SIZE = { width: 1200, height: 630 };
 
+/**
+ * Tamanho dos Stories (Instagram, WhatsApp, Facebook): 9:16. O app cobre ~260 px em cima
+ * (barra de progresso e nome) e embaixo (campo de resposta): o conteúdo fica fora dessas faixas.
+ */
+export const STORY_SIZE = { width: 1080, height: 1920 };
+
 export const C = {
   bg: '#0d0e12',
   bg2: '#13151b',

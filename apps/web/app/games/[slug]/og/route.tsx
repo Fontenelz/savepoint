@@ -1,17 +1,20 @@
 import type { GameDetail } from '@savepoint/shared';
-import { Brand, C, Cover, GradientLine, OG_CACHE, OG_SIZE, loadImage, ogImage } from '@/lib/og';
+import { Brand, C, Cover, GradientLine, OG_CACHE, loadImage, ogImage } from '@/lib/og';
+import { bannerJpeg, bannerResponse } from '@/lib/og-banner';
 import { publicApi } from '@/lib/public-api';
 
-export const size = OG_SIZE;
-export const contentType = 'image/png';
-export const alt = 'Jogo no Savepoint';
-
-/** Só dados de catálogo (capa, banner, título, ano, gêneros): pode ter cache. */
-export default async function Image({ params }: { params: Promise<{ slug: string }> }) {
+/**
+ * GET /games/:slug/og — imagem da prévia do link (WhatsApp, X, Discord…).
+ * Com banner: a foto do banner ocupando o cartão (estilo Letterboxd). Sem banner: cartão gerado.
+ * Só dados de catálogo: pode ter cache.
+ */
+export async function GET(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const game = await publicApi<GameDetail>(`/games/${encodeURIComponent(slug)}`);
-  // Sem o banner ao fundo e com capa de 240 px: PNG de foto pesa muito (GTA V: 514 KB com banner e
-  // capa de 300 px; 268 KB assim). Prévias leves carregam em qualquer rede (WhatsApp descarta pesadas).
+  const banner = await bannerJpeg(game?.backdropUrl);
+  if (banner) return bannerResponse(banner, OG_CACHE.catalog);
+
+  // Capa de 240 px: PNG de foto pesa muito (WhatsApp descarta prévias pesadas).
   const cover = await loadImage(game?.coverUrl);
   const meta = [game?.releaseYear, game?.developer].filter(Boolean).join(' · ');
   const genres = (game?.genres ?? []).slice(0, 3).map((g) => g.name);

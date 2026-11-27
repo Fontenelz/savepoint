@@ -21,15 +21,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const r = await getReview(id);
   const game = r.game.releaseYear ? `${r.game.title} (${r.game.releaseYear})` : r.game.title;
   const save = r.save.number > 1 ? ` · Save ${r.save.number}` : '';
-  const head = [ratingToStars(r.rating), PLAY_STATUS_LABEL[r.save.status]].filter(Boolean).join(' · ');
+  const stars = ratingToStars(r.rating);
   // Spoiler: o texto não vai para a prévia (WhatsApp, X, Discord mostram a descrição).
   const body = r.spoiler ? 'Review com spoilers — abra para ler.' : (r.review ?? '');
+  const path = reviewPath(r);
   return publicPageMeta({
     title: `Review de ${game} por ${r.user.displayName}${save}`,
-    description: metaDescription(`${head}${save}${body ? ` — ${body}` : ''}`),
-    path: reviewPath(r),
+    // Prévia no estilo Letterboxd: "Review ★★★★ de Jogo (ano)", e o texto da review embaixo.
+    shareTitle: `Review ${stars ? `${stars} ` : ''}de ${game}`,
+    description: metaDescription(`${r.user.displayName} · ${PLAY_STATUS_LABEL[r.save.status]}${save}${body ? ` — ${body}` : ''}`),
+    path,
     type: 'article',
-    ownImage: true,
+    image: { url: `${path}/og`, alt: `Review de ${r.game.title}` },
   });
 }
 

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Avatar, Histogram, ListCard, Poster, SectionHead, ShelfBar, Stars } from '@/components/bits';
 import { GameActions, OpenLogButton } from '@/components/GameActions';
 import { GameCover } from '@/components/GameCover';
+import { GameTopBar } from '@/components/GameTopBar';
 import { Icon, STATUS_COLOR } from '@/components/Icon';
 import { Review } from '@/components/Review';
 import { Slider } from '@/components/Slider';
@@ -23,7 +24,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: `${g.title}${g.releaseYear ? ` (${g.releaseYear})` : ''}`,
       description: metaDescription(g.summary, `${g.title} no Savepoint: notas da comunidade, reviews e quem está jogando.`),
       path: `/games/${g.slug}`,
-      ownImage: true,
+      image: { url: `/games/${g.slug}/og`, alt: g.title },
     });
   } catch {
     return { title: 'Jogo' };
@@ -81,6 +82,7 @@ export default async function GamePage({ params }: Props) {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: gameJsonLd(game) }} />
+      <GameTopBar />
       <div className={`backdrop ${game.backdropUrl ? 'has-art' : ''}`} aria-hidden>
         {game.backdropUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -295,6 +297,7 @@ export default async function GamePage({ params }: Props) {
             initialSave={game.viewerSave}
             endlessHint={game.endlessHint}
             loggedIn={Boolean(viewer)}
+            viewer={viewer}
             myLists={myLists.map((l) => ({ id: l.id, title: l.title }))}
           />
 
@@ -305,7 +308,7 @@ export default async function GamePage({ params }: Props) {
             <Histogram histogram={stats.histogram} avg={stats.ratingAvg} count={stats.ratingCount} />
           </div>
 
-          <div className="panel">
+          <div className="panel panel-shelf">
             <h3>Estante da comunidade</h3>
             <ShelfBar counts={stats.statusCounts} />
           </div>

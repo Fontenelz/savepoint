@@ -31,6 +31,8 @@ const PATHS = {
   share: 'M12 15V3M7.5 7.5L12 3l4.5 4.5M8 11H5v10h14V11h-3',
   save: 'M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6',
   flag: 'M5 21V4h11l-2 4 2 4H5',
+  more: 'M5 11a1 1 0 1 0 0 2 1 1 0 0 0 0-2zM12 11a1 1 0 1 0 0 2 1 1 0 0 0 0-2zM19 11a1 1 0 1 0 0 2 1 1 0 0 0 0-2z',
+  back: 'M15 5l-7 7 7 7',
   lock: 'M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3',
 } as const;
 

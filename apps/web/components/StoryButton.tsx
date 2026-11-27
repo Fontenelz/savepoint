@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { fetchImageFile, shareImageFile } from '@/lib/share';
 import { Icon } from './Icon';
 
 /**
@@ -13,28 +14,8 @@ export function StoryButton({ path, fileName }: { path: string; fileName: string
   async function onClick() {
     setState('busy');
     try {
-      const res = await fetch(path, { cache: 'no-store' });
-      if (!res.ok) throw new Error(String(res.status));
-      const blob = await res.blob();
-      const file = new File([blob], fileName, { type: 'image/png' });
-
-      const touch = window.matchMedia('(hover: none)').matches;
-      if (touch && navigator.canShare?.({ files: [file] })) {
-        try {
-          await navigator.share({ files: [file] });
-        } catch {
-          /* cancelado pelo usuário */
-        }
-        setState('idle');
-        return;
-      }
-
-      const url = URL.createObjectURL(blob);
-      const a = Object.assign(document.createElement('a'), { href: url, download: fileName });
-      document.body.append(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const res = await shareImageFile(await fetchImageFile(path, fileName));
+      if (res === 'shared') return setState('idle');
       setState('done');
     } catch {
       setState('error');
