@@ -29,7 +29,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
       }}
     >
       <div style={{ display: 'flex', borderRadius: 14, boxShadow: '0 40px 90px rgba(0,0,0,0.65)' }}>
-        <Cover src={cover} width={600} />
+        {/* 2:3: a capa inteira, sem cortar o logo no topo (na moldura 3:4 do site ela é recortada) */}
+        <Cover src={cover} width={560} ratio={1.5} />
       </div>
       <div
         style={{
