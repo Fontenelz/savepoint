@@ -1,11 +1,8 @@
 import { PLAY_STATUS_LABEL } from '@savepoint/shared';
 import { ImageResponse } from 'next/og';
-import { C, Cover, GradientLine, Logo, OG_CACHE, loadImage } from '@/lib/og';
+import { C, Cover, GradientLine, Logo, OG_CACHE, STORY_SIZE, loadImage } from '@/lib/og';
 import { Heart, ReviewAvatar, STATUS_HEX, StarRow, Tag, excerpt, loadReview } from '@/lib/og-review';
 import { SITE_URL } from '@/lib/site';
-
-/** Tamanho dos Stories (Instagram, WhatsApp, Facebook): 9:16. */
-const STORY = { width: 1080, height: 1920 };
 
 /**
  * GET /u/:usuario/reviews/:id/story — cartão vertical da review para postar nos Stories.
@@ -94,7 +91,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ usernam
       </div>
     </div>,
     {
-      ...STORY,
+      ...STORY_SIZE,
       headers: {
         'cache-control': OG_CACHE.user,
         'content-disposition': `inline; filename="savepoint-${r.game.slug}.png"`,

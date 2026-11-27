@@ -51,7 +51,8 @@ Env: `apps/api/.env` (DATABASE_URL, JWT_SECRET, IGDB opcional) e `apps/web/.env.
 **Front**
 - Tema escuro; fontes: Bricolage Grotesque (títulos), Inter (texto), JetBrains Mono (números), Big Shoulders (capas geradas e números do Top 10). Navbar com cor própria (`--nav-bg`) e linha em degradê.
 - Home: boas-vindas, **"Seu save"** (carrossel jogando + quero jogar, com progresso por horas), **Top 10 em alta** (números gigantes vazados estilo Netflix), novidades dos amigos, reviews e listas.
-- Página do jogo com banner, painel de ações (status, estrelas, like, Top 4, diário, listas), histograma, estante da comunidade.
+- Página do jogo com banner, painel de ações (status, estrelas, like, Top 4, diário, listas), histograma, estante da comunidade. No celular (≤760px) o painel vira a barra "Você zerou este jogo ⋯" + folha de ações (`ActionSheet`), também aberta pelo ⋯ sobre o banner (`GameTopBar`).
+- Compartilhar: prévia de link (`/games/:slug/og`, `/u/:u/reviews/:id/og`) usa o banner recortado em JPEG 1200×630 via `sharp` (cartão gerado se não houver banner); Stories em `/games/:slug/story` e `/u/:u/reviews/:id/story`.
 - Perfil com HUD de contadores, Top 4, carrosséis, diário por mês, abas.
 - Componentes-chave: `Slider` (carrossel com scroll-snap, tamanhos `md`/`lg`/`rank`), `QueueCarousel`, `TopRanking`, `UserMenu` (fecha ao clicar fora/Esc/navegar), `Avatar` (silhueta, sem iniciais).
 - Responsivo verificado em 360/390px (sem overflow horizontal) e desktop.

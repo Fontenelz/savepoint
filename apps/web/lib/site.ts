@@ -33,6 +33,8 @@ export function publicPageMeta({
   path,
   type = 'website',
   ownImage = false,
+  image,
+  shareTitle = title,
 }: {
   title: string;
   description: string;
@@ -40,18 +42,24 @@ export function publicPageMeta({
   type?: 'website' | 'profile' | 'article';
   /** A rota tem opengraph-image.tsx próprio. Imagem configurada aqui SUBSTITUIRIA a do arquivo. */
   ownImage?: boolean;
+  /** Imagem servida por uma rota própria (ex.: /games/x/og, que pode ser JPEG do banner). */
+  image?: { url: string; alt: string };
+  /** Título da prévia do link, quando difere do título da aba. */
+  shareTitle?: string;
 }) {
   // Sem imagem própria, a página perderia a imagem herdada ao definir o próprio openGraph: usa a da marca.
   // Com imagem própria, a chave `images` NÃO pode existir (nem vazia): o Next a trata como
   // "sem imagem" e descarta a do opengraph-image.tsx (verificado no HTML gerado).
-  const images = ownImage
-    ? {}
-    : { images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Savepoint — seu diário de jogos' }] };
+  const images = image
+    ? { images: [{ ...image, width: 1200, height: 630 }] }
+    : ownImage
+      ? {}
+      : { images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Savepoint — seu diário de jogos' }] };
   return {
     title,
     description,
     alternates: { canonical: path },
-    openGraph: { type, siteName: SITE_NAME, locale: 'pt_BR', title, description, url: path, ...images },
-    twitter: { card: 'summary_large_image' as const, title, description, ...images },
+    openGraph: { type, siteName: SITE_NAME, locale: 'pt_BR', title: shareTitle, description, url: path, ...images },
+    twitter: { card: 'summary_large_image' as const, title: shareTitle, description, ...images },
   };
 }
