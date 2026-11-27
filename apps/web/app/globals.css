@@ -1304,7 +1304,7 @@ a.chip:hover {
 .game-hud {
   margin-top: 18px;
   display: grid;
-  grid-template-columns: repeat(5, auto);
+  grid-template-columns: repeat(4, auto);
   justify-content: start;
 }
 
@@ -3012,10 +3012,10 @@ a.chip:hover {
     order: 1;
   }
 
-  /* Números: 5 colunas iguais, como os contadores do perfil */
+  /* Números: 4 colunas iguais, como os contadores do perfil */
   .game-hud {
     margin-top: 4px;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .game-hud > div {
