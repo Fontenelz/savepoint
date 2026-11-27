@@ -197,10 +197,6 @@ export default async function GamePage({ params }: Props) {
               <b>{stats.statusCounts.BACKLOG}</b>
               <span>Querem jogar</span>
             </div>
-            <div>
-              <b>{stats.logCount}</b>
-              <span>Checkpoints</span>
-            </div>
           </div>
 
           {game.summary && <p className="game-summary">{game.summary}</p>}

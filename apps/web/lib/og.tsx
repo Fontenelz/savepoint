@@ -76,9 +76,12 @@ export function Brand() {
   );
 }
 
-/** Capa 3:4 (ou um bloco neutro quando não há imagem). */
-export function Cover({ src, width }: { src: string | null; width: number }) {
-  const height = Math.round((width * 4) / 3);
+/**
+ * Capa (ou um bloco neutro quando não há imagem). Moldura 3:4 por padrão, como no site;
+ * `ratio` 1.5 = 2:3, o formato das capas da Steam (600×900), que assim aparecem inteiras.
+ */
+export function Cover({ src, width, ratio = 4 / 3 }: { src: string | null; width: number; ratio?: number }) {
+  const height = Math.round(width * ratio);
   return src ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={src} width={width} height={height} style={{ objectFit: 'cover', borderRadius: 10 }} alt="" />
